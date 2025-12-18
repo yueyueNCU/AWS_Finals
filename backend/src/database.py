@@ -1,10 +1,9 @@
+from dotenv import load_dotenv
+load_dotenv()
 import os
 from .modules.iam.infrastructure.models import Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-from dotenv import load_dotenv
-load_dotenv()
 
 # --- 設定 AWS RDS 連線 (同你原本的程式碼) ---
 RDS_USER = os.getenv("DB_USER", "postgres")

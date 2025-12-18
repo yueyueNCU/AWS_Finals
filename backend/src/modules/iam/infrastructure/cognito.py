@@ -3,6 +3,8 @@ import time
 from jose import jwk, jwt
 from jose.utils import base64url_decode
 from ..application.interfaces import IdentityProvider, IdentityData
+import logging
+logger = logging.getLogger(__name__)
 
 class CognitoIdentityProvider(IdentityProvider):
     def __init__(self, region: str, user_pool_id: str, app_client_id: str, domain: str, redirect_uri: str, client_secret: str):
@@ -96,7 +98,7 @@ class CognitoIdentityProvider(IdentityProvider):
         
         if response.status_code != 200:
             # 印出詳細錯誤訊息方便除錯
-            print(f"Error exchanging token: {response.text}")
+            logger.error(f"Error exchanging token: {response.text}")
             raise ValueError(f"Failed to exchange token: {response.text}")
             
         return response.json()['id_token']

@@ -22,10 +22,10 @@ class SqlAlchemyUserRepository(UserRepository):
 
         # 2. 使用 merge (如果 ID 存在就更新，不存在就新增)
         # 這比 add() 更安全，適合 "Save" 的語意
-        self.db.merge(user_model)
+        merged_model = self.db.merge(user_model)
         self.db.commit()
-        
-        # 3. 回傳原本的 Entity (保持介面一致性)
+        # 如果需要回傳最新狀態，建議從 merged_model 轉回 Entity
+        # return self._to_entity(merged_model) 
         return user
 
     def get_by_email(self, email: str) -> Optional[User]:

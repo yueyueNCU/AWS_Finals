@@ -1,3 +1,4 @@
+import os
 import uuid
 from typing import Optional
 
@@ -17,16 +18,13 @@ class AuthService:
 
     def login(self, request: GoogleLoginRequest) -> UserProfileResponse:
         # 1. 新增這一步：先拿 Code 換 Token
-        # 注意：這裡呼叫的是我們剛剛在 CognitoIdentityProvider 新寫的方法
-        # 但因為我們在 interfaces.py 沒定義這個方法，Python 檢查可能會亮紅燈，但執行是沒問題的
-        # (正規做法是要去 interfaces.py 補上定義，這裡先略過)
         id_token = self.identity_provider.exchange_code_for_token(request.code)
 
         # 2. 驗證 Token (原本的邏輯，傳入剛剛換到的 id_token)
         identity_data = self.identity_provider.verify_token(id_token)
 
-        ALLOWED_DOMAIN = "g.ncu.edu.tw"
-        if not identity_data.email.endswith(f"@{ALLOWED_DOMAIN}"):
+        allowed_domain = os.getenv("ALLOWED_EMAIL_DOMAIN", "g.ncu.edu.tw")
+        if not identity_data.email.endswith(f"@{allowed_domain}"):
             # 如果不符合，直接拋出錯誤，拒絕登入
             raise ValueError(f"只允許中央大學的信箱登入")
         
@@ -59,5 +57,5 @@ class AuthService:
             name=user.name,
             avatar_url=user.avatar_url,
             is_admin=user.is_admin,
-            access_token=id_token  # <--- 把剛剛拿到的 Token 傳回去！
+            access_token=id_token 
         )
