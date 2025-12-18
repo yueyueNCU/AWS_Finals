@@ -1,0 +1,5 @@
+venv/
+__pycache__/
+*.pyc
+# 忽略系統檔案
+.DS_Store
