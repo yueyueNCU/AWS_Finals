@@ -3,7 +3,7 @@ from typing import Optional
 
 # --- Request (Input) ---
 class GoogleLoginRequest(BaseModel):
-    id_token: str  # 前端從 Google 拿到的 Token
+    code: str  # 前端從 Google 拿到的 Token
 
 # --- Response (Output) ---
 class UserProfileResponse(BaseModel):

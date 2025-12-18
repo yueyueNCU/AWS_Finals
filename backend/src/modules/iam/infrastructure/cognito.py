@@ -5,14 +5,15 @@ from jose.utils import base64url_decode
 from ..application.interfaces import IdentityProvider, IdentityData
 
 class CognitoIdentityProvider(IdentityProvider):
-    def __init__(self, region: str, user_pool_id: str, app_client_id: str):
+    def __init__(self, region: str, user_pool_id: str, app_client_id: str, domain: str, redirect_uri: str):
         self.region = region
         self.user_pool_id = user_pool_id
         self.app_client_id = app_client_id
+        self.domain = domain           # 新增
+        self.redirect_uri = redirect_uri # 新增
         
-        # 這是 AWS Cognito 存放公鑰的標準網址
         self.jwks_url = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
-        self._keys = None # 用來快取公鑰，不用每次都去下載
+        self._keys = None
 
     def _get_keys(self):
         """下載並快取 AWS 的公鑰"""
@@ -73,3 +74,22 @@ class CognitoIdentityProvider(IdentityProvider):
             avatar_url=claims.get('picture'),        # Cognito 的圖片欄位通常叫 picture
             # sub=claims.get('sub')                  # 如果你需要 Cognito ID
         )
+    
+    def exchange_code_for_token(self, code: str) -> str:
+        token_url = f"https://{self.domain}/oauth2/token"
+        
+        data = {
+            'grant_type': 'authorization_code',
+            'client_id': self.app_client_id,
+            'code': code,
+            'redirect_uri': self.redirect_uri
+        }
+        
+        # 發送 POST 請求給 Cognito
+        response = requests.post(token_url, data=data, headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        
+        if response.status_code != 200:
+            raise ValueError(f"Failed to exchange token: {response.text}")
+            
+        # 回傳 id_token
+        return response.json()['id_token']

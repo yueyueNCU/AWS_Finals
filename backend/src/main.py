@@ -44,13 +44,24 @@ def get_db():
 # 2. 取得 AuthService
 # 這樣做的好處是 FastAPI 會自動幫你把 DB session 注入進去
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
-    # 設定 AWS Cognito 參數 (記得設環境變數)
     region = os.getenv("AWS_REGION", "us-east-1")
     user_pool_id = os.getenv("COGNITO_USER_POOL_ID", "us-east-1_xxxxxx")
     app_client_id = os.getenv("COGNITO_APP_CLIENT_ID", "xxxxxx")
     
+    # 新增讀取這兩個變數
+    cognito_domain = os.getenv("COGNITO_DOMAIN","xxxdomain")
+    redirect_uri = os.getenv("COGNITO_REDIRECT_URI","xxx_redirect")
+    
     user_repo = SqlAlchemyUserRepository(db)
-    identity_provider = CognitoIdentityProvider(region, user_pool_id, app_client_id)
+    
+    # 傳入 5 個參數
+    identity_provider = CognitoIdentityProvider(
+        region, 
+        user_pool_id, 
+        app_client_id, 
+        cognito_domain, 
+        redirect_uri
+    )
     
     return AuthService(user_repo, identity_provider)
 
