@@ -12,12 +12,16 @@ from .modules.iam.infrastructure.cognito import CognitoIdentityProvider
 from .modules.iam.application.service import AuthService
 from .modules.iam.application.dtos import GoogleLoginRequest, UserProfileResponse
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # --- 設定 AWS RDS 連線 (同你原本的程式碼) ---
 RDS_USER = os.getenv("DB_USER", "postgres")
 RDS_PASSWORD = os.getenv("DB_PASSWORD", "password")
+print(RDS_PASSWORD)
 RDS_HOST = os.getenv("DB_HOST", "localhost")
 RDS_PORT = os.getenv("DB_PORT", "5432")
-RDS_DB_NAME = os.getenv("DB_NAME", "my_db")
+RDS_DB_NAME = os.getenv("DB_NAME", "my_user_db")
 
 DATABASE_URL = f"postgresql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
 
