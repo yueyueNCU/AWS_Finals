@@ -16,19 +16,23 @@ class AuthService:
         self.identity_provider = identity_provider
 
     def login(self, request: GoogleLoginRequest) -> UserProfileResponse:
-        # 1. 驗證 Token (委託給 infrastructure 實作去跑)
-        # 如果 Token 無效，identity_provider 應該要拋出錯誤
-        identity_data = self.identity_provider.verify_token(request.id_token)
+        # 1. 新增這一步：先拿 Code 換 Token
+        # 注意：這裡呼叫的是我們剛剛在 CognitoIdentityProvider 新寫的方法
+        # 但因為我們在 interfaces.py 沒定義這個方法，Python 檢查可能會亮紅燈，但執行是沒問題的
+        # (正規做法是要去 interfaces.py 補上定義，這裡先略過)
+        id_token = self.identity_provider.exchange_code_for_token(request.code)
 
-        # 2. 檢查使用者是否存在 (Find)
-        # 這裡假設用 Email 當唯一識別，你也可以改用 Cognito Sub ID
+        # 2. 驗證 Token (原本的邏輯，傳入剛剛換到的 id_token)
+        identity_data = self.identity_provider.verify_token(id_token)
+
+        # 3. 檢查使用者是否存在 (以下邏輯完全不變)
         existing_user = self.user_repo.get_by_email(identity_data.email)
 
         if existing_user:
             user = existing_user
-            # (可選) 可以在這裡更新使用者的頭像或名字，保持資料同步
-            # user.avatar_url = identity_data.avatar_url
-            # self.user_repo.save(user)
+            user.name = identity_data.name
+            user.avatar_url = identity_data.avatar_url
+            self.user_repo.save(user)
         else:
             # 3. 如果不存在，自動註冊 (Create)
             new_user = User(

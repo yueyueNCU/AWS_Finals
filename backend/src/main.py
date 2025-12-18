@@ -47,20 +47,22 @@ def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
     region = os.getenv("AWS_REGION", "us-east-1")
     user_pool_id = os.getenv("COGNITO_USER_POOL_ID", "us-east-1_xxxxxx")
     app_client_id = os.getenv("COGNITO_APP_CLIENT_ID", "xxxxxx")
+    cognito_domain = os.getenv("COGNITO_DOMAIN","xxx")
+    redirect_uri = os.getenv("COGNITO_REDIRECT_URI","xxx")
     
-    # 新增讀取這兩個變數
-    cognito_domain = os.getenv("COGNITO_DOMAIN","xxxdomain")
-    redirect_uri = os.getenv("COGNITO_REDIRECT_URI","xxx_redirect")
-    
+    # 新增讀取 Secret
+    client_secret = os.getenv("COGNITO_CLIENT_SECRET","xxx") 
+
     user_repo = SqlAlchemyUserRepository(db)
     
-    # 傳入 5 個參數
+    # 傳入 6 個參數
     identity_provider = CognitoIdentityProvider(
         region, 
         user_pool_id, 
         app_client_id, 
         cognito_domain, 
-        redirect_uri
+        redirect_uri,
+        client_secret # <--- 這裡傳進去
     )
     
     return AuthService(user_repo, identity_provider)

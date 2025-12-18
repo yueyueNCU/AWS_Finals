@@ -5,12 +5,13 @@ from jose.utils import base64url_decode
 from ..application.interfaces import IdentityProvider, IdentityData
 
 class CognitoIdentityProvider(IdentityProvider):
-    def __init__(self, region: str, user_pool_id: str, app_client_id: str, domain: str, redirect_uri: str):
+    def __init__(self, region: str, user_pool_id: str, app_client_id: str, domain: str, redirect_uri: str, client_secret: str):
         self.region = region
         self.user_pool_id = user_pool_id
         self.app_client_id = app_client_id
-        self.domain = domain           # 新增
-        self.redirect_uri = redirect_uri # 新增
+        self.domain = domain
+        self.redirect_uri = redirect_uri
+        self.client_secret = client_secret  # <--- 新增這行：把密碼存起來
         
         self.jwks_url = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
         self._keys = None
@@ -78,18 +79,24 @@ class CognitoIdentityProvider(IdentityProvider):
     def exchange_code_for_token(self, code: str) -> str:
         token_url = f"https://{self.domain}/oauth2/token"
         
+        # 2. 修改 data，把 client_secret 加進去
         data = {
             'grant_type': 'authorization_code',
             'client_id': self.app_client_id,
             'code': code,
             'redirect_uri': self.redirect_uri
         }
-        
-        # 發送 POST 請求給 Cognito
+
+        # 如果有設定密碼，就加進去
+        if self.client_secret:
+            data['client_secret'] = self.client_secret 
+
+        # 發送 POST 請求
         response = requests.post(token_url, data=data, headers={'Content-Type': 'application/x-www-form-urlencoded'})
         
         if response.status_code != 200:
+            # 印出詳細錯誤訊息方便除錯
+            print(f"Error exchanging token: {response.text}")
             raise ValueError(f"Failed to exchange token: {response.text}")
             
-        # 回傳 id_token
         return response.json()['id_token']
