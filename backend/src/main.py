@@ -1,38 +1,72 @@
+# backend/src/main.py
+
 import os
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
+
+# 引入你的模組
 from .modules.iam.infrastructure.models import Base
+from .modules.iam.infrastructure.repository import SqlAlchemyUserRepository
+from .modules.iam.infrastructure.cognito import CognitoIdentityProvider
+from .modules.iam.application.service import AuthService
+from .modules.iam.application.dtos import GoogleLoginRequest, UserProfileResponse
 
-# --- 設定 AWS RDS 連線資訊 ---
-# 建議：不要把密碼直接寫在程式碼裡！請使用環境變數 (os.getenv)
-# 你可以在電腦上執行 `export DB_PASSWORD=你的密碼`，或是使用 .env 檔案
-RDS_USER = os.getenv("DB_USER", "postgres")        # AWS RDS 的 Master Username
-RDS_PASSWORD = os.getenv("DB_PASSWORD", "mypassword") # AWS RDS 的 Master Password
-RDS_HOST = os.getenv("DB_HOST", "my-rds-instance.xxxx.us-east-1.rds.amazonaws.com") # Endpoint
-RDS_PORT = os.getenv("DB_PORT", "5432")            # PostgreSQL 預設 5432, MySQL 預設 3306
-RDS_DB_NAME = os.getenv("DB_NAME", "my_project_db") # 你在 RDS 裡建立的資料庫名稱
+# --- 設定 AWS RDS 連線 (同你原本的程式碼) ---
+RDS_USER = os.getenv("DB_USER", "postgres")
+RDS_PASSWORD = os.getenv("DB_PASSWORD", "password")
+RDS_HOST = os.getenv("DB_HOST", "localhost")
+RDS_PORT = os.getenv("DB_PORT", "5432")
+RDS_DB_NAME = os.getenv("DB_NAME", "my_db")
 
-# 組合連線字串 (Connection String)
-# 格式: postgresql://帳號:密碼@網址:Port/資料庫名
 DATABASE_URL = f"postgresql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
 
-# 如果是用 MySQL，格式如下：
-# DATABASE_URL = f"mysql+pymysql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
-
-# --- 建立 Engine ---
-# 注意：RDS 不需要 connect_args={"check_same_thread": False}，那是 SQLite 專用的
 engine = create_engine(DATABASE_URL)
-
-# --- 建立 Session工廠 ---
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# --- 初始化資料表 ---
-# 這行會自動連上 RDS，檢查有沒有 users 表格，沒有的話就自動建立 (Create Table)
 Base.metadata.create_all(bind=engine)
 
+# --- FastAPI App 初始化 ---
+app = FastAPI(title="AWS Finals API")
+
+# --- Dependency Injection (相依性注入) ---
+# 1. 取得 DB Session
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+# 2. 取得 AuthService
+# 這樣做的好處是 FastAPI 會自動幫你把 DB session 注入進去
+def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
+    # 設定 AWS Cognito 參數 (記得設環境變數)
+    region = os.getenv("AWS_REGION", "us-east-1")
+    user_pool_id = os.getenv("COGNITO_USER_POOL_ID", "us-east-1_xxxxxx")
+    app_client_id = os.getenv("COGNITO_APP_CLIENT_ID", "xxxxxx")
+    
+    user_repo = SqlAlchemyUserRepository(db)
+    identity_provider = CognitoIdentityProvider(region, user_pool_id, app_client_id)
+    
+    return AuthService(user_repo, identity_provider)
+
+# --- API Routes (路由) ---
+@app.get("/")
+def read_root():
+    return {"message": "Server is running!"}
+
+@app.post("/auth/login", response_model=UserProfileResponse)
+def login(
+    request: GoogleLoginRequest, 
+    service: AuthService = Depends(get_auth_service)
+):
+    try:
+        # 這裡會呼叫你寫好的 Service 邏輯
+        user_profile = service.login(request)
+        return user_profile
+    except ValueError as e:
+        # 處理驗證失敗 (例如 Token 過期)
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        # 處理其他錯誤
+        raise HTTPException(status_code=500, detail=str(e))
