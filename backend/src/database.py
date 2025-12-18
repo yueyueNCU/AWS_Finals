@@ -1,0 +1,28 @@
+import os
+from .modules.iam.infrastructure.models import Base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from dotenv import load_dotenv
+load_dotenv()
+
+# --- 設定 AWS RDS 連線 (同你原本的程式碼) ---
+RDS_USER = os.getenv("DB_USER", "postgres")
+RDS_PASSWORD = os.getenv("DB_PASSWORD", "password")
+RDS_HOST = os.getenv("DB_HOST", "localhost")
+RDS_PORT = os.getenv("DB_PORT", "5432")
+RDS_DB_NAME = os.getenv("DB_NAME", "my_user_db")
+
+DATABASE_URL = f"postgresql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base.metadata.create_all(bind=engine)
+
+# --- Dependency: 取得 DB Session ---
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

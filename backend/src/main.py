@@ -1,89 +1,13 @@
-# backend/src/main.py
+from fastapi import FastAPI
+from .modules.iam.presentation.router import router as iam_router # 引入 IAM 的 router
 
-import os
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-
-# 引入你的模組
-from .modules.iam.infrastructure.models import Base
-from .modules.iam.infrastructure.repository import SqlAlchemyUserRepository
-from .modules.iam.infrastructure.cognito import CognitoIdentityProvider
-from .modules.iam.application.service import AuthService
-from .modules.iam.application.dtos import GoogleLoginRequest, UserProfileResponse
-
-from dotenv import load_dotenv
-load_dotenv()
-
-# --- 設定 AWS RDS 連線 (同你原本的程式碼) ---
-RDS_USER = os.getenv("DB_USER", "postgres")
-RDS_PASSWORD = os.getenv("DB_PASSWORD", "password")
-print(RDS_PASSWORD)
-RDS_HOST = os.getenv("DB_HOST", "localhost")
-RDS_PORT = os.getenv("DB_PORT", "5432")
-RDS_DB_NAME = os.getenv("DB_NAME", "my_user_db")
-
-DATABASE_URL = f"postgresql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base.metadata.create_all(bind=engine)
-
-# --- FastAPI App 初始化 ---
+# 初始化 App
 app = FastAPI(title="AWS Finals API")
 
-# --- Dependency Injection (相依性注入) ---
-# 1. 取得 DB Session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# --- 註冊路由 (Include Routers) ---
+# 這行指令會把 IAM 模組裡定義的所有 API (login, me) 都掛載進來
+app.include_router(iam_router)
 
-# 2. 取得 AuthService
-# 這樣做的好處是 FastAPI 會自動幫你把 DB session 注入進去
-def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
-    region = os.getenv("AWS_REGION", "us-east-1")
-    user_pool_id = os.getenv("COGNITO_USER_POOL_ID", "us-east-1_xxxxxx")
-    app_client_id = os.getenv("COGNITO_APP_CLIENT_ID", "xxxxxx")
-    cognito_domain = os.getenv("COGNITO_DOMAIN","xxx")
-    redirect_uri = os.getenv("COGNITO_REDIRECT_URI","xxx")
-    
-    # 新增讀取 Secret
-    client_secret = os.getenv("COGNITO_CLIENT_SECRET","xxx") 
-
-    user_repo = SqlAlchemyUserRepository(db)
-    
-    # 傳入 6 個參數
-    identity_provider = CognitoIdentityProvider(
-        region, 
-        user_pool_id, 
-        app_client_id, 
-        cognito_domain, 
-        redirect_uri,
-        client_secret # <--- 這裡傳進去
-    )
-    
-    return AuthService(user_repo, identity_provider)
-
-# --- API Routes (路由) ---
 @app.get("/")
 def read_root():
     return {"message": "Server is running!"}
-
-@app.post("/auth/login", response_model=UserProfileResponse)
-def login(
-    request: GoogleLoginRequest, 
-    service: AuthService = Depends(get_auth_service)
-):
-    try:
-        # 這裡會呼叫你寫好的 Service 邏輯
-        user_profile = service.login(request)
-        return user_profile
-    except ValueError as e:
-        # 處理驗證失敗 (例如 Token 過期)
-        raise HTTPException(status_code=401, detail=str(e))
-    except Exception as e:
-        # 處理其他錯誤
-        raise HTTPException(status_code=500, detail=str(e))

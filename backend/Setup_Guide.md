@@ -25,3 +25,13 @@
     ```
     pip freeze > requirements.txt
     ```
+
+## 如何開啟後端fastAPi server 
+1. 進入backend資料夾
+    ```
+    cd backend
+    ```
+2. 開啟server
+    ```
+    uvicorn src.main:app --reload
+    ```

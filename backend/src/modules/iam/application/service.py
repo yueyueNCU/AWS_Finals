@@ -25,6 +25,11 @@ class AuthService:
         # 2. 驗證 Token (原本的邏輯，傳入剛剛換到的 id_token)
         identity_data = self.identity_provider.verify_token(id_token)
 
+        ALLOWED_DOMAIN = "g.ncu.edu.tw"
+        if not identity_data.email.endswith(f"@{ALLOWED_DOMAIN}"):
+            # 如果不符合，直接拋出錯誤，拒絕登入
+            raise ValueError(f"只允許中央大學的信箱登入")
+        
         # 3. 檢查使用者是否存在 (以下邏輯完全不變)
         existing_user = self.user_repo.get_by_email(identity_data.email)
 
@@ -42,10 +47,17 @@ class AuthService:
                 password_hash="EXTERNAL_COGNITO",  # 標記為外部帳號
                 avatar_url=identity_data.avatar_url,
                 is_admin=False, # 預設權限
-                is_active=True
+                is_active=True,
             )
             # 存入資料庫
             user = self.user_repo.save(new_user)
 
         # 4. 將 Domain Entity 轉為 Response DTO
-        return UserProfileResponse.model_validate(user)
+        return UserProfileResponse(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            avatar_url=user.avatar_url,
+            is_admin=user.is_admin,
+            access_token=id_token  # <--- 把剛剛拿到的 Token 傳回去！
+        )
