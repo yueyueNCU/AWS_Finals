@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS Security Stack: Security Groups and Instance Profile (AWS Academy Version)."
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: MyWebArchitecture
+    Description: Must match the ProjectName used in the Network Stack.
+
+  LabRoleName:
+    Type: String
+    Default: LabRole
+    Description: The name of the existing IAM Role provided by AWS Academy (usually 'LabRole').
+
+Resources:
+  # ==========================================
+  # 1. Instance Profile
+  # ==========================================
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref LabRoleName
+
+  # ==========================================
+  # 2. Security Groups
+  # ==========================================
+
+  # A. Load Balancer SG
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-ALB-SG
+      GroupDescription: Allow HTTP/HTTPS from Internet
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-ALB-SG
+
+  # B. App (EC2) SG
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-App-SG
+      GroupDescription: Allow traffic from ALB only
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-App-SG
+
+  # C. Database (RDS) SG
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-DB-SG
+      GroupDescription: Allow traffic from App Server only
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-VPCID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-DB-SG
+
+# ==========================================
+# Outputs
+# ==========================================
+Outputs:
+  ALBSecurityGroupId:
+    Description: Security Group for Load Balancer
+    Value: !Ref ALBSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-ALBSG
+
+  AppSecurityGroupId:
+    Description: Security Group for EC2 Instances
+    Value: !Ref AppSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-AppSG
+
+  DBSecurityGroupId:
+    Description: Security Group for RDS
+    Value: !Ref DBSecurityGroup
+    Export:
+      Name: !Sub ${ProjectName}-DBSG
+
+  EC2InstanceProfileName:
+    Description: IAM Instance Profile for EC2
+    Value: !Ref EC2InstanceProfile
+    Export:
+      Name: !Sub ${ProjectName}-InstanceProfile

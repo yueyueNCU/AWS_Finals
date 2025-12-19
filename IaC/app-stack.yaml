@@ -1,0 +1,146 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS App Stack: ALB, Auto Scaling Group, and Launch Template."
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: MyWebArchitecture
+    Description: Must match the ProjectName used in other stacks.
+
+  # 自動取得最新的 Amazon Linux 2023 AMI ID
+  LatestAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64"
+
+Resources:
+  # ==========================================
+  # 1. Application Load Balancer (Public)
+  # ==========================================
+  MyALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${ProjectName}-ALB
+      Scheme: internet-facing
+      Type: application
+      Subnets:
+        - Fn::ImportValue: !Sub ${ProjectName}-PublicSubnet1
+        - Fn::ImportValue: !Sub ${ProjectName}-PublicSubnet2
+      SecurityGroups:
+        - Fn::ImportValue: !Sub ${ProjectName}-ALBSG
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-ALB
+
+  # ==========================================
+  # 2. Target Group
+  # ==========================================
+  MyTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${ProjectName}-TG
+      Port: 80
+      Protocol: HTTP
+      VpcId:
+        Fn::ImportValue: !Sub ${ProjectName}-VPCID
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      TargetType: instance
+
+  # ==========================================
+  # 3. ALB Listener (HTTP)
+  # ==========================================
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyTargetGroup
+      LoadBalancerArn: !Ref MyALB
+      Port: 80
+      Protocol: HTTP
+
+  # ==========================================
+  # 4. Launch Template (EC2 設定檔)
+  # ==========================================
+  MyLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${ProjectName}-LaunchTemplate
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: t2.micro
+
+        # 綁定 IAM Instance Profile (使用 Security Stack 輸出的 Profile)
+        IamInstanceProfile:
+          Name:
+            Fn::ImportValue: !Sub ${ProjectName}-InstanceProfile
+
+        # 綁定 Security Group
+        SecurityGroupIds:
+          - Fn::ImportValue: !Sub ${ProjectName}-AppSG
+
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              dnf update -y
+              dnf install -y httpd php php-mysqlnd
+              systemctl start httpd
+              systemctl enable httpd
+
+              # 取得 IMDSv2 Token
+              TOKEN=`curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600"`
+
+              # 使用 Token 取得 Availability Zone
+              AZ=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+
+              # 建立網頁
+              cat <<EOF > /var/www/html/index.html
+              <html>
+              <head><title>AWS Demo</title></head>
+              <body>
+                <div style="text-align: center; margin-top: 50px;">
+                  <h1>Hello from ${ProjectName}!</h1>
+                  <p>This page is served from EC2 in a Private Subnet.</p>
+                  <hr/>
+                  <p><b>Server IP:</b> $(hostname -I)</p>
+                  <p><b>Availability Zone:</b> $AZ</p>
+                  <p><b>Database Endpoint:</b> ${DBEndpoint}</p>
+                </div>
+              </body>
+              </html>
+              EOF
+            - DBEndpoint:
+                Fn::ImportValue: !Sub ${ProjectName}-RDSEndpoint
+
+  # ==========================================
+  # 5. Auto Scaling Group
+  # ==========================================
+  MyASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${ProjectName}-ASG
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MyLaunchTemplate
+        Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
+      # 設定在 Private Subnets
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Sub ${ProjectName}-PrivateSubnet1
+        - Fn::ImportValue: !Sub ${ProjectName}-PrivateSubnet2
+      TargetGroupARNs:
+        - !Ref MyTargetGroup
+      MinSize: "2"
+      MaxSize: "4"
+      DesiredCapacity: "2"
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+
+# ==========================================
+# Outputs
+# ==========================================
+Outputs:
+  LoadBalancerDNS:
+    Description: The public DNS name of the load balancer
+    Value: !GetAtt MyALB.DNSName
+    Export:
+      Name: !Sub ${ProjectName}-ALB-DNS
