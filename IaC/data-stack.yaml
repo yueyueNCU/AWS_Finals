@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS Data Stack: Multi-AZ RDS (MySQL) and S3 Bucket."
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: MyWebArchitecture
+    Description: Must match the ProjectName used in Network and Security stacks (Keep this MixedCase for Imports).
+
+  DBUser:
+    Type: String
+    Default: admin
+    Description: Master username for the RDS database.
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Default: dbpassword
+    Description: Master password for the RDS database. (Must be at least 8 characters)
+
+  DBName:
+    Type: String
+    Default: myappdb
+    Description: The name of the initial database to be created.
+
+Resources:
+  # ==========================================
+  # 1. S3 Bucket
+  # ==========================================
+  MyS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub mywebarchitecture-assets-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-S3
+
+  # ==========================================
+  # 2. RDS Subnet Group
+  # ==========================================
+  MyDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS
+      SubnetIds:
+        - Fn::ImportValue: !Sub ${ProjectName}-PrivateSubnet1
+        - Fn::ImportValue: !Sub ${ProjectName}-PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-DB-Subnet-Group
+
+  # ==========================================
+  # 3. RDS Instance (MySQL)
+  # ==========================================
+  MyRDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: mysql
+      EngineVersion: "8.0"
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      StorageType: gp2
+
+      DBName: !Ref DBName
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+
+      DBSubnetGroupName: !Ref MyDBSubnetGroup
+      VPCSecurityGroups:
+        - Fn::ImportValue: !Sub ${ProjectName}-DBSG
+
+      MultiAZ: true
+
+      PubliclyAccessible: false
+      StorageEncrypted: false
+      MonitoringInterval: 0
+
+      DeleteAutomatedBackups: true
+
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-RDS
+
+# ==========================================
+# Outputs
+# ==========================================
+Outputs:
+  RDSEndpoint:
+    Description: The connection endpoint for the database
+    Value: !GetAtt MyRDSInstance.Endpoint.Address
+    Export:
+      Name: !Sub ${ProjectName}-RDSEndpoint
+
+  S3BucketName:
+    Description: The name of the S3 bucket
+    Value: !Ref MyS3Bucket
+    Export:
+      Name: !Sub ${ProjectName}-S3BucketName
