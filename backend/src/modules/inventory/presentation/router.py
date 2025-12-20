@@ -52,8 +52,6 @@ async def create_item(
 
     # 讀取檔案內容 (bytes)
     file_content = await image.read()
-    
-    if image is None:
 
     try:
         # 呼叫 Service 處理業務邏輯 (上傳 S3 + 寫入 DB)

@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 from .modules.iam.infrastructure.models import Base
+from .modules.inventory.infrastructure.models import ItemModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 

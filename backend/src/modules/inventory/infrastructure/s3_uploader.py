@@ -6,7 +6,7 @@ import uuid
 class S3ImageStorage(ImageStorageService):
     def __init__(self):
         self.bucket_name = os.getenv("S3_BUCKET_NAME")
-        self.region = os.getenv("AWS_S3_REGION", "us-east-1")
+        self.region = os.getenv("AWS_REGION", "us-east-1")
         
         # 取得環境變數中的金鑰 (本機開發用)
         aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
