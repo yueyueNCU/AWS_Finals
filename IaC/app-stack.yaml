@@ -17,7 +17,17 @@ Parameters:
     Type: String
     Default: arn:aws:acm:us-east-1:534207971056:certificate/a93ab9b7-1021-45ff-8c5e-89f162d803c2
     Description: "The ARN of the SSL certificate in AWS ACM"
-
+    
+  DBUser:
+    Type: String
+    Default: admin
+  DBPassword:
+    Type: String
+    Default: dbpassword
+    NoEcho: true
+  DBName:
+    Type: String
+    Default: myappdb
 
 Resources:
   # ==========================================
@@ -119,7 +129,25 @@ Resources:
               unzip /home/ec2-user/backend.zip -d /home/ec2-user/api_app
 
               # 3. 安裝 Python 套件
-              cd /home/ec2-user/api_app
+              cd /home/ec2-user/api_app/backend
+
+              cat <<EOF > .env
+              DB_HOST=${RDSEndpoint}
+              DB_USER=${DBUser}
+              DB_PASSWORD=${DBPassword}
+              DB_NAME=${DBName}
+              DB_PORT=3306
+              AWS_REGION="ap-southeast-2"
+              COGNITO_USER_POOL_ID="ap-southeast-2_TCtE1x780"
+              COGNITO_APP_CLIENT_ID="3e01cbi503u29lb0jpm62ospm4"
+              COGNITO_DOMAIN="ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com"
+              COGNITO_REDIRECT_URI=https://www.yueyue.site/callback/
+              COGNITO_CLIENT_SECRET="1v5aaact530l7cdve24shfm1qsseckbr03a3067i8ggk2usretml"
+              ALLOWED_EMAIL_DOMAIN="g.ncu.edu.tw"
+              
+              S3_BUCKET_NAME=${S3BucketName}
+              EOF
+
               pip3 install -r requirements.txt
 
               # 4. 設定 Systemd 讓 FastAPI 開機自動執行
@@ -130,9 +158,9 @@ Resources:
 
               [Service]
               User=root
-              WorkingDirectory=/home/ec2-user/api_app
+              WorkingDirectory=/home/ec2-user/api_app/backend
               # 讓 Uvicorn 跑在 8000 port
-              ExecStart=/usr/local/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+              ExecStart=/usr/bin/python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000
               Restart=always
 
               [Install]
@@ -146,11 +174,19 @@ Resources:
                   listen 80;
                   server_name _;
 
-                  location / {
+                  location ~ ^/(items|auth|docs|exchanges|locations|categories|openapi.json) {
                       proxy_pass http://127.0.0.1:8000;
                       proxy_set_header Host \$host;
                       proxy_set_header X-Real-IP \$remote_addr;
                       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  }
+
+                  location / {
+                      # 這裡會用到從 data-stack 匯入的 FrontendURL
+                      proxy_pass ${FrontendURL};
+                      proxy_intercept_errors on; 
+                      # 如果 S3 回傳 404 (例如重整 Vue 頁面時)，強制回傳 index.html 讓前端 Router 處理
+                      error_page 404 =200 /index.html;
                   }
               }
               EOF
@@ -164,7 +200,10 @@ Resources:
 
             - S3BucketName:
                 Fn::ImportValue: !Sub ${ProjectName}-S3BucketName
-
+              RDSEndpoint:
+                Fn::ImportValue: !Sub ${ProjectName}-RDSEndpoint
+              FrontendURL:
+                Fn::ImportValue: !Sub ${ProjectName}-FrontendURL
   # ==========================================
   # 6. Auto Scaling Group
   # ==========================================
