@@ -2,9 +2,11 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 from .modules.iam.infrastructure.models import Base
-from .modules.inventory.infrastructure.models import ItemModel
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+Base = declarative_base()
 
 # --- 設定 AWS RDS 連線 (同你原本的程式碼) ---
 RDS_USER = os.getenv("DB_USER", "postgres")
@@ -13,9 +15,9 @@ RDS_HOST = os.getenv("DB_HOST", "localhost")
 RDS_PORT = os.getenv("DB_PORT", "5432")
 RDS_DB_NAME = os.getenv("DB_NAME", "my_user_db")
 
-DATABASE_URL = f"postgresql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
+DATABASE_URL = f"mysql+pymysql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_recycle=3600)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
