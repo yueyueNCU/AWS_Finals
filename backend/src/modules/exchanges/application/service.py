@@ -1,0 +1,195 @@
+import uuid
+from datetime import datetime
+from typing import List, Optional
+
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from ...inventory.domain.entity import ItemStatus
+
+# 假設你需要存取 Items 來檢查擁有權或更新狀態
+from ...inventory.domain.repository import ItemRepository
+
+# 引入相關 Entity 與 Repository
+from ..domain.entity import Exchange, ExchangeStatus
+from ..domain.repository import ExchangeRepository
+
+# 為了組裝回應，這裡我們可能需要直接存取 DB Model 或是使用各模組的 Repository
+# 為了簡化範例，這裡假設 Service 可以存取 DB Session 做關聯查詢 (更進階做法是透過 ReadModel)
+from ..infrastructure.models import ExchangeModel
+
+# 地點清單 (暫時寫死，也可以存資料庫)
+LOCATIONS = {1: "正門圓環", 2: "男九舍全家", 3: "依仁堂籃球場"}
+
+
+class ExchangeService:
+    def __init__(
+        self, repo: ExchangeRepository, item_repo: ItemRepository, db: Session
+    ):
+        self.repo = repo
+        self.item_repo = item_repo
+        self.db = db
+
+    def create_exchange(
+        self, requester_id: str, target_item_id: str, dto: "CreateExchangeRequest"
+    ) -> Exchange:
+        # 1. 檢查目標物品是否存在
+        target_item = self.item_repo.get_by_id(target_item_id)
+        if not target_item:
+            raise HTTPException(status_code=404, detail="Target item not found")
+
+        if target_item.owner_id == requester_id:
+            raise HTTPException(status_code=400, detail="Cannot exchange with yourself")
+
+        # 2. 如果有提供交換物，檢查是否屬於該使用者
+        if dto.offered_item_id:
+            offered_item = self.item_repo.get_by_id(dto.offered_item_id)
+            if not offered_item or offered_item.owner_id != requester_id:
+                raise HTTPException(status_code=400, detail="Invalid offered item")
+
+        # 3. 建立交換請求
+        new_exchange = Exchange(
+            id=str(uuid.uuid4()),
+            requester_id=requester_id,
+            owner_id=target_item.owner_id,
+            target_item_id=target_item_id,
+            offered_item_id=dto.offered_item_id,
+            status=ExchangeStatus.PENDING,
+            message=dto.message,
+        )
+        return self.repo.save(new_exchange)
+
+    def get_exchanges(self, user_id: str, role: str):
+        # 1. 取得原始資料
+        exchanges = self.repo.find_by_user(user_id, role)
+
+        results = []
+        for e in exchanges:
+            # 為了效率，這裡建議一樣做個簡單的查詢或重用 _enrich 邏輯
+            # 這裡我們先用最簡單的方式：重用 _enrich 取得完整資料，再轉成前端要的格式
+            full_data = self._enrich_exchange_data(e.id)
+
+            # 2. 判斷誰是 Partner
+            if role == "requester":
+                # 我是申請者，Partner 就是物品主人 (owner)
+                partner_info = {
+                    "id": full_data["owner"]["user_id"],
+                    "name": full_data["owner"]["nickname"],  # 前端用 .name
+                    "avatar_url": full_data["owner"]["avatar_url"],
+                }
+            else:
+                # 我是物品主人，Partner 就是申請者 (requester)
+                partner_info = {
+                    "id": full_data["requester"]["user_id"],
+                    "name": full_data["requester"]["nickname"],  # 前端用 .name
+                    "avatar_url": full_data["requester"]["avatar_url"],
+                }
+
+            # 3. 組裝成前端 ProfileView 預期的格式
+            results.append(
+                {
+                    "exchange_id": full_data["id"],  # 前端要 exchange_id
+                    "status": full_data["status"],
+                    "partner": partner_info,  # 前端要 partner
+                    "target_item": full_data["target_item"],
+                    "offered_item": full_data["offered_item"],
+                }
+            )
+
+        return results
+
+    def get_exchange_detail(self, exchange_id: str) -> "ExchangeDetailResponse":
+        return self._enrich_exchange_data(exchange_id)
+
+    def update_status(
+        self, user_id: str, exchange_id: str, dto: "UpdateExchangeStatusRequest"
+    ):
+        exchange = self.repo.get_by_id(exchange_id)
+        if not exchange:
+            raise HTTPException(status_code=404, detail="Exchange not found")
+
+        # 只有擁有者(賣家)可以接受/拒絕
+        if exchange.owner_id != user_id:
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+        if dto.action == "accept":
+            exchange.status = ExchangeStatus.ACCEPTED
+            exchange.meetup_location_id = dto.meetup_location_id
+
+            # 更新物品狀態為 "交易中" (Locked)
+            target = self.item_repo.get_by_id(exchange.target_item_id)
+            if target:
+                target.status = ItemStatus.TRADING
+                self.item_repo.save(target)
+
+            # 如果有交換物，也鎖定
+            if exchange.offered_item_id:
+                offered = self.item_repo.get_by_id(exchange.offered_item_id)
+                if offered:
+                    offered.status = ItemStatus.TRADING
+                    self.item_repo.save(offered)
+
+        elif dto.action == "reject":
+            exchange.status = ExchangeStatus.REJECTED
+
+        exchange.updated_at = datetime.now()
+        self.repo.save(exchange)
+        return self._enrich_exchange_data(exchange_id)
+
+    def _enrich_exchange_data(self, exchange_id: str):
+        # 使用 SQLAlchemy Model 直接做 Join 查詢以取得 User 和 Item 資料
+        # 這樣比一個個用 Repository 查更有效率
+        model = (
+            self.db.query(ExchangeModel).filter(ExchangeModel.id == exchange_id).first()
+        )
+        if not model:
+            raise HTTPException(status_code=404, detail="Exchange not found")
+
+        # 組裝回應
+        deal_info = None
+        if (
+            model.status in [ExchangeStatus.ACCEPTED, ExchangeStatus.COMPLETED]
+            and model.meetup_location_id
+        ):
+            loc_name = LOCATIONS.get(model.meetup_location_id, "Unknown")
+            deal_info = {
+                "meetup_location": {"id": model.meetup_location_id, "name": loc_name},
+                "accepted_at": model.updated_at,  # 簡化：用更新時間當作接受時間
+            }
+
+        return {
+            "id": model.id,
+            "status": model.status,
+            "created_at": model.created_at,
+            "updated_at": model.updated_at,
+            "message": model.message,
+            "requester": {
+                "user_id": model.requester.id,
+                "nickname": model.requester.name,  # 對應 UserModel.name
+                "avatar_url": model.requester.avatar_url,
+            },
+            "owner": {
+                "user_id": model.owner.id,
+                "nickname": model.owner.name,
+                "avatar_url": model.owner.avatar_url,
+            },
+            "target_item": {
+                "item_id": model.target_item.id,
+                "title": model.target_item.title,
+                "cover_image": model.target_item.image_url,
+                "status": model.target_item.status,
+            },
+            "offered_item": (
+                {
+                    "item_id": model.offered_item.id,
+                    "title": model.offered_item.title,
+                    "cover_image": model.offered_item.image_url,
+                }
+                if model.offered_item
+                else None
+            ),
+            "deal_info": deal_info,
+        }
+
+    def get_locations(self):
+        return [{"id": k, "name": v} for k, v in LOCATIONS.items()]
