@@ -129,12 +129,18 @@ Outputs:
     Export:
       Name: !Sub ${ProjectName}-RDSEndpoint
 
-  S3BucketName:
+  PublicAssetsBucketName:
     Description: The name of the S3 bucket
     Value: !Ref FrontendBucket
     Export:
-      Name: !Sub ${ProjectName}-S3BucketName
+      Name: !Sub ${ProjectName}-PublicBucket
 
+  PrivateAssetsBucketName:
+    Description: The name of the Private Asset S3 bucket
+    Value: !Ref MyS3Bucket
+    Export:
+      Name: !Sub ${ProjectName}-PrivateBucket
+      
   FrontendWebsiteURL:
     Description: The URL of the Vue frontend website
     Value: !GetAtt FrontendBucket.WebsiteURL
