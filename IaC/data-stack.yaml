@@ -38,7 +38,40 @@ Resources:
         RestrictPublicBuckets: true
       Tags:
         - Key: Name
-          Value: !Sub ${ProjectName}-S3
+          Value: !Sub ${ProjectName}-Private-Assets
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "mywebarchitecture-frontend-${AWS::AccountId}"
+
+      # 啟用靜態網站託管
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-Frontend-Web
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "arn:aws:s3:::${FrontendBucket}/*"
 
   # ==========================================
   # 2. RDS Subnet Group
@@ -96,8 +129,20 @@ Outputs:
     Export:
       Name: !Sub ${ProjectName}-RDSEndpoint
 
-  S3BucketName:
+  PublicAssetsBucketName:
     Description: The name of the S3 bucket
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub ${ProjectName}-PublicBucket
+
+  PrivateAssetsBucketName:
+    Description: The name of the Private Asset S3 bucket
     Value: !Ref MyS3Bucket
     Export:
-      Name: !Sub ${ProjectName}-S3BucketName
+      Name: !Sub ${ProjectName}-PrivateBucket
+      
+  FrontendWebsiteURL:
+    Description: The URL of the Vue frontend website
+    Value: !GetAtt FrontendBucket.WebsiteURL
+    Export:
+      Name: !Sub ${ProjectName}-FrontendURL
