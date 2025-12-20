@@ -141,7 +141,7 @@ Resources:
               COGNITO_USER_POOL_ID="ap-southeast-2_TCtE1x780"
               COGNITO_APP_CLIENT_ID="3e01cbi503u29lb0jpm62ospm4"
               COGNITO_DOMAIN="ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com"
-              COGNITO_REDIRECT_URI=https://www.yueyue.site/auth/callback/
+              COGNITO_REDIRECT_URI=https://www.yueyue.site/callback/
               COGNITO_CLIENT_SECRET="1v5aaact530l7cdve24shfm1qsseckbr03a3067i8ggk2usretml"
               ALLOWED_EMAIL_DOMAIN="g.ncu.edu.tw"
               
@@ -174,11 +174,19 @@ Resources:
                   listen 80;
                   server_name _;
 
-                  location / {
+                  location ~ ^/(items|auth|docs|exchanges|locations|categories|openapi.json) {
                       proxy_pass http://127.0.0.1:8000;
                       proxy_set_header Host \$host;
                       proxy_set_header X-Real-IP \$remote_addr;
                       proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  }
+
+                  location / {
+                      # 這裡會用到從 data-stack 匯入的 FrontendURL
+                      proxy_pass ${FrontendURL};
+                      proxy_intercept_errors on; 
+                      # 如果 S3 回傳 404 (例如重整 Vue 頁面時)，強制回傳 index.html 讓前端 Router 處理
+                      error_page 404 =200 /index.html;
                   }
               }
               EOF
@@ -194,6 +202,8 @@ Resources:
                 Fn::ImportValue: !Sub ${ProjectName}-S3BucketName
               RDSEndpoint:
                 Fn::ImportValue: !Sub ${ProjectName}-RDSEndpoint
+              FrontendURL:
+                Fn::ImportValue: !Sub ${ProjectName}-FrontendURL
   # ==========================================
   # 6. Auto Scaling Group
   # ==========================================
