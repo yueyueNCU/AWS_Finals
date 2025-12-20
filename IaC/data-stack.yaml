@@ -131,7 +131,7 @@ Outputs:
 
   S3BucketName:
     Description: The name of the S3 bucket
-    Value: !Ref MyS3Bucket
+    Value: !Ref FrontendBucket
     Export:
       Name: !Sub ${ProjectName}-S3BucketName
 
