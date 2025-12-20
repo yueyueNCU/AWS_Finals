@@ -3,7 +3,7 @@ import axios from 'axios'
 // 1. 建立 axios 實體
 // import.meta.env.VITE_API_URL 會讀取 .env 檔案裡的設定
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000', 
+  baseURL: import.meta.env.VITE_API_URL || 'https://www.yueyue.site', 
   headers: {
     'Content-Type': 'application/json',
   },

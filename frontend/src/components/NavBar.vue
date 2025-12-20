@@ -35,7 +35,7 @@ const handleLogin = () => {
   const cognitoDomain = 'https://ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com'; 
   
   // 2. App Client ID (一串亂碼)
-  const clientId = '3e01cbi503u29lb0jpm62ospm4'; 
+  const clientId = '3e01cbi503u29lb0jpm62ospm4' ; 
   
   const baseUrl = import.meta.env.VITE_APP_BASE_URL;
 
