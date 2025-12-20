@@ -7,13 +7,12 @@ from sqlalchemy.orm import sessionmaker
 from .modules.inventory.infrastructure.models import ItemModel
 
 # --- 設定 AWS RDS 連線 (同你原本的程式碼) ---
-RDS_USER = os.getenv("DB_USER", "postgres")
-RDS_PASSWORD = os.getenv("DB_PASSWORD", "password")
-RDS_HOST = os.getenv("DB_HOST", "localhost")
-RDS_PORT = os.getenv("DB_PORT", "5432")
-RDS_DB_NAME = os.getenv("DB_NAME", "my_user_db")
+RDS_USER = os.getenv("DB_USER", "")
+RDS_PASSWORD = os.getenv("DB_PASSWORD", "")
+RDS_HOST = os.getenv("DB_HOST", "")
+RDS_PORT = os.getenv("DB_PORT", "")
+RDS_DB_NAME = os.getenv("DB_NAME", "")
 
-# 在測試環境中下方請用postgresql:// ....
 DATABASE_URL = f"mysql+pymysql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
 
 engine = create_engine(DATABASE_URL, pool_recycle=3600)
