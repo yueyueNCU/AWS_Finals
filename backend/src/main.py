@@ -10,7 +10,7 @@ app = FastAPI(title="AWS Finals API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # 指定前端網址，或用 ["*"]
+    allow_origins=["https://www.yueyue.site"], # 指定前端網址，或用 ["*"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
