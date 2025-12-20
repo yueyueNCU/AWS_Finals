@@ -1,10 +1,16 @@
-<!-- 登入回調頁 (處理 Cognito 轉回來的 code) -->
- <template>
+<template>
   <div class="login-container">
     <h2>正在登入中...</h2>
     <p>請稍候，正在進行身分驗證</p>
   </div>
 </template>
+
+<script>
+// 【關鍵修正】
+// 將變數宣告在 script setup 之外，使其成為該模組的全域變數。
+// 即使 Component 被重新建立，這個變數依然會保持 true，防止二次執行。
+let isLoginProcessing = false;
+</script>
 
 <script setup>
 import { onMounted } from 'vue';
@@ -16,23 +22,42 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 onMounted(async () => {
-  // 1. 從網址取得 code 參數
-  // 網址長這樣: http://localhost:5173/auth/callback?code=xxxx-xxxx
   const code = route.query.code;
 
+  // 1. 檢查是否正在處理中 (鎖定)
+  if (isLoginProcessing) {
+    console.warn('Login is already processing, skipping double call.');
+    return; 
+  }
+
   if (code) {
+    isLoginProcessing = true; // 上鎖
+
     try {
       // 2. 呼叫 Store 進行登入
       await authStore.login(code);
       
-      // 3. 登入成功，跳轉回首頁
+      // 3. 登入成功
       router.push('/');
     } catch (error) {
-      alert('登入失敗，請重試');
-      router.push('/');
+      console.error('Login error:', error);
+      
+      // 【進階防護】
+      // 如果後端回傳 400/500，但 LocalStorage 其實已經有 Token 了 (可能是第一次請求成功，第二次失敗)
+      // 我們可以視為成功，直接跳轉，不要報錯
+      if (localStorage.getItem('access_token')) {
+         console.warn('Token exists despite error, redirecting to home.');
+         router.push('/');
+      } else {
+         alert('登入失敗，請重試');
+         router.push('/');
+      }
+    } finally {
+      // 這裡故意 "不" 把 isLoginProcessing 設回 false
+      // 因為 code 是一次性的，失敗或成功後都不該再用同一個 code 試圖登入
+      // 等到使用者離開頁面或重新整理，模組重新載入時自然會重置
     }
   } else {
-    // 沒有 code，代表使用者是直接跑進來這個頁面
     router.push('/');
   }
 });
@@ -44,7 +69,7 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100vh; /* 滿版高度 */
+  height: 100vh;
   text-align: center;
 }
 </style>

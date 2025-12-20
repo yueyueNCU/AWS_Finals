@@ -1,4 +1,5 @@
-// 對應後端 inventory 模組 (刊登、搜尋、詳情)import apiClient from './index';
+// 對應後端 inventory 模組 (刊登、搜尋、詳情)
+import apiClient from './index';
 
 export default {
   // 1. 取得物品列表 (支援搜尋與篩選)
