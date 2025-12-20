@@ -125,7 +125,7 @@ Resources:
 
               # 2. 準備後端程式碼 (從您原本的私有 Data Bucket 下載)
               # 假設您將後端程式碼打包成 backend.zip 上傳到私有 Bucket
-              aws s3 cp s3://${S3BucketName}/backend.zip /home/ec2-user/backend.zip
+              aws s3 cp s3://${PrivateAssetsBucketName}/backend.zip /home/ec2-user/backend.zip
               unzip /home/ec2-user/backend.zip -d /home/ec2-user/api_app
 
               # 3. 安裝 Python 套件
@@ -138,6 +138,7 @@ Resources:
               DB_NAME=${DBName}
               DB_PORT=3306
               AWS_REGION="ap-southeast-2"
+              AWS_S3_REGION="us-east-1"
               COGNITO_USER_POOL_ID="ap-southeast-2_TCtE1x780"
               COGNITO_APP_CLIENT_ID="3e01cbi503u29lb0jpm62ospm4"
               COGNITO_DOMAIN="ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com"
@@ -145,7 +146,7 @@ Resources:
               COGNITO_CLIENT_SECRET="1v5aaact530l7cdve24shfm1qsseckbr03a3067i8ggk2usretml"
               ALLOWED_EMAIL_DOMAIN="g.ncu.edu.tw"
               
-              S3_BUCKET_NAME=${S3BucketName}
+              S3_BUCKET_NAME=${PublicAssetsBucketName}
               EOF
 
               pip3 install -r requirements.txt
@@ -198,8 +199,10 @@ Resources:
               systemctl start nginx
               systemctl enable nginx
 
-            - S3BucketName:
-                Fn::ImportValue: !Sub ${ProjectName}-S3BucketName
+            - PrivateAssetsBucketName:
+                Fn::ImportValue: !Sub ${ProjectName}-PrivateBucket
+              PublicAssetsBucketName:
+                Fn::ImportValue: !Sub ${ProjectName}-PublicBucket
               RDSEndpoint:
                 Fn::ImportValue: !Sub ${ProjectName}-RDSEndpoint
               FrontendURL:
