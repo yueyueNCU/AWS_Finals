@@ -11,6 +11,13 @@ Parameters:
   LatestAmiId:
     Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
     Default: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64"
+  
+  #加入SSL憑證
+  CertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:534207971056:certificate/a93ab9b7-1021-45ff-8c5e-89f162d803c2
+    Description: "The ARN of the SSL certificate in AWS ACM"
+
 
 Resources:
   # ==========================================
@@ -52,15 +59,34 @@ Resources:
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref MyTargetGroup
       LoadBalancerArn: !Ref MyALB
       Port: 80
       Protocol: HTTP
-
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: "HTTPS"
+            Port: "443"
+            Host: "#{host}"
+            Path: "/#{path}"
+            Query: "#{query}"
+            StatusCode: "HTTP_301"
   # ==========================================
-  # 4. Launch Template (EC2 設定檔)
+  # 4. ALB Listener (HTTPS) -> 負責解密並轉發
+  # ==========================================
+  ALBListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref MyALB
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyTargetGroup
+  # ==========================================
+  # 5. Launch Template (EC2 設定檔)
   # ==========================================
   MyLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -140,7 +166,7 @@ Resources:
                 Fn::ImportValue: !Sub ${ProjectName}-S3BucketName
 
   # ==========================================
-  # 5. Auto Scaling Group
+  # 6. Auto Scaling Group
   # ==========================================
   MyASG:
     Type: AWS::AutoScaling::AutoScalingGroup
