@@ -1,4 +1,4 @@
-// 對應後端 inventory 模組 (交換、訊息)import apiClient from './index';
+import apiClient from './index';
 
 export default {
   // --- 交換流程 ---
@@ -33,7 +33,7 @@ export default {
     return apiClient.get('/locations');
   },
   
-  // 6. 取得分類清單 (如果後端有這支 API 的話，沒有的話可以直接寫死在前端)
+  // 6. 取得分類清單
   getCategories() {
       return apiClient.get('/categories');
   }

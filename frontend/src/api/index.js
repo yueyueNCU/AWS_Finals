@@ -1,5 +1,5 @@
 // Axios 的全域設定 (設定 BaseURL, Interceptor)import axios from 'axios';
-
+import axios from 'axios'
 // 1. 建立 axios 實體
 // import.meta.env.VITE_API_URL 會讀取 .env 檔案裡的設定
 const apiClient = axios.create({

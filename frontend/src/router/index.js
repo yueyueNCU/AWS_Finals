@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import LoginView from '../views/LoginView.vue' // 引入剛寫好的元件
+import LoginView from '../views/LoginView.vue'
+import PostItemView from '../views/PostItemView.vue'     // 新增引入
+import ItemDetailView from '../views/ItemDetailView.vue' // 新增引入
+import ProfileView from '../views/ProfileView.vue'       // 新增引入
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,12 +14,25 @@ const router = createRouter({
       component: HomeView
     },
     {
-      // 這是 Cognito 設定的 Callback URL 路徑
       path: '/auth/callback',
       name: 'login-callback',
       component: LoginView
     },
-    // ... 其他頁面之後再加
+    {
+      path: '/post',
+      name: 'post-item',
+      component: PostItemView
+    },
+    {
+      path: '/items/:id', // :id 代表動態參數
+      name: 'item-detail',
+      component: ItemDetailView
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView
+    }
   ]
 })
 
