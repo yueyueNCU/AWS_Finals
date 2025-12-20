@@ -14,7 +14,7 @@ const router = createRouter({
       component: HomeView
     },
     {
-      path: '/callback',
+      path: '/callback/',
       name: 'login-callback',
       component: LoginView
     },
