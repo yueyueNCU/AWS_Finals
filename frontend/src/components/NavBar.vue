@@ -32,14 +32,14 @@ const authStore = useAuthStore();
 const handleLogin = () => {
   // *** 請跟你的 AWS 組員拿這些資訊 ***
   // 1. Cognito Domain (例如: https://ncu-project.auth.us-east-1.amazoncognito.com)
-  const cognitoDomain = 'https://<你的COGNITO_DOMAIN>'; 
+  const cognitoDomain = 'https://ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com'; 
   
   // 2. App Client ID (一串亂碼)
-  const clientId = '<你的APP_CLIENT_ID>'; 
+  const clientId = '3e01cbi503u29lb0jpm62ospm4'; 
   
   // 3. Callback URL (必須跟 AWS 後台設定的一模一樣)
   // 本機開發通常是: http://localhost:5173/auth/callback
-  const redirectUri = encodeURIComponent('http://localhost:5173/auth/callback');
+  const redirectUri = encodeURIComponent('http://localhost:5173/callback/');
 
   // 4. 拼湊出登入網址
   const loginUrl = `${cognitoDomain}/login?client_id=${clientId}&response_type=code&scope=email+openid+profile&redirect_uri=${redirectUri}`;

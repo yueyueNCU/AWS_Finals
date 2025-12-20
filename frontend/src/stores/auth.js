@@ -5,51 +5,52 @@ import { ref, computed } from 'vue';
 import { authApi } from '@/api'; // 引用我們上一步寫好的 API
 
 export const useAuthStore = defineStore('auth', () => {
-  // --- State (資料) ---
+  // 這裡建議預設值給 null，比較好判斷
   const token = ref(localStorage.getItem('access_token') || '');
-  const user = ref(null);
+  const user = ref(JSON.parse(localStorage.getItem('user_info') || 'null')); // 多存一個 user_info 到 localStorage 避免重整後名字消失
 
-  // --- Getters (計算屬性) ---
   const isLoggedIn = computed(() => !!token.value);
 
-  // --- Actions (動作) ---
-  
-  // 1. 處理登入 (拿 code 換 token)
   const login = async (code) => {
     try {
+      // 呼叫後端
       const response = await authApi.login(code);
-      // 假設後端回傳格式: { access_token: "...", ...user_info }
+      
+      // 根據你提供的資料結構:
+      // { "id": "...", "name": "陳揚盛", "access_token": "...", ... }
       const { access_token, ...userData } = response.data;
       
-      // 存到狀態與 LocalStorage
+      // 更新狀態
       token.value = access_token;
-      user.value = userData;
-      localStorage.setItem('access_token', access_token);
+      user.value = userData; // 這裡面會有 name, email, avatar_url
       
-      return true; // 登入成功
+      // 存入 LocalStorage (讓 F5 重新整理後還記得)
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('user_info', JSON.stringify(userData)); // 新增這一行
+      
+      return true;
     } catch (error) {
       console.error('Login failed:', error);
       throw error;
     }
   };
 
-  // 2. 登出
   const logout = () => {
     token.value = '';
     user.value = null;
     localStorage.removeItem('access_token');
-    // 可以選擇重新整理頁面或跳轉
+    localStorage.removeItem('user_info'); // 記得一併清除
     window.location.href = '/'; 
   };
-
-  // 3. 初始化 (F5 重新整理後，試著把使用者資料抓回來)
+  
+  // fetchUser 可以保留，用來驗證 Token 有效性並更新最新資料
   const fetchUser = async () => {
     if (!token.value) return;
     try {
       const response = await authApi.getMe();
-      user.value = response.data;
+      user.value = response.data; // 更新 user 資料
+      localStorage.setItem('user_info', JSON.stringify(response.data)); // 同步更新 storage
     } catch (error) {
-      // Token 可能過期了，強制登出
       logout();
     }
   };

@@ -15,7 +15,7 @@ RDS_HOST = os.getenv("DB_HOST", "localhost")
 RDS_PORT = os.getenv("DB_PORT", "5432")
 RDS_DB_NAME = os.getenv("DB_NAME", "my_user_db")
 
-DATABASE_URL = f"mysql+pymysql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
+DATABASE_URL = f"postgresql://{RDS_USER}:{RDS_PASSWORD}@{RDS_HOST}:{RDS_PORT}/{RDS_DB_NAME}"
 
 engine = create_engine(DATABASE_URL, pool_recycle=3600)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
