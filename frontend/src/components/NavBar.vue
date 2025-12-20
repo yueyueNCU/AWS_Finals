@@ -40,7 +40,7 @@ const handleLogin = () => {
   const baseUrl = import.meta.env.VITE_APP_BASE_URL;
 
   // 3. Callback URL (必須跟 AWS 後台設定的一模一樣)
-  // 本機開發通常是: http://localhost:5173/auth/callback
+  // 本機開發通常是: http://localhost:5173/callback
   const redirectUri = encodeURIComponent(`${baseUrl}/callback/`);
 
   // 4. 拼湊出登入網址
