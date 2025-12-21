@@ -1,9 +1,8 @@
-// 對應後端 inventory 模組 (刊登、搜尋、詳情)
+// frontend/src/api/items.js
 import apiClient from './index';
 
 export default {
   // 1. 取得物品列表 (支援搜尋與篩選)
-  // params 範例: { keyword: '微積分', category: 'TEXTBOOK' }
   getItems(params) {
     return apiClient.get('/items/', { params });
   },
@@ -13,18 +12,12 @@ export default {
     return apiClient.get(`/items/${id}`);
   },
 
-  // 取得我刊登的物品
-  getMyItems() {
-    return apiClient.get('/items/me');
-  },
-
-  // 3. 刊登物品 (需要上傳圖片，所以要用 FormData)
+  // 3. 刊登物品
   createItem(data) {
     const formData = new FormData();
     formData.append('title', data.title);
     formData.append('description', data.description);
     formData.append('category', data.category);
-    // data.image 必須是 File 物件 (從 <input type="file"> 拿到的)
     formData.append('image', data.image); 
 
     return apiClient.post('/items/', formData, {
@@ -34,8 +27,18 @@ export default {
     });
   },
   
-  // 4. 下架或管理狀態 (如果未來有的話)
+  // 4. 更新物品狀態
   updateItemStatus(id, status) {
       return apiClient.patch(`/items/${id}/status`, { status });
+  },
+
+  // [新增] 5. 取得我的物品 (我的物品頁面用)
+  getMyItems() {
+    return apiClient.get('/items/me');
+  },
+
+  // [新增] 6. 取得分類清單 (首頁選單用)
+  getCategories() {
+    return apiClient.get('/items/categories');
   }
 };
