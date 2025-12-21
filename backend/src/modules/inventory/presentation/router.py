@@ -64,6 +64,8 @@ async def create_item(
             filename=image.filename or "unknown_file",
             content_type=image.content_type
         )
+        new_item.owner_name = current_user.name
+        
         return new_item
         
     except Exception as e:
