@@ -5,7 +5,7 @@ import PostItemView from '../views/PostItemView.vue'
 import ItemDetailView from '../views/ItemDetailView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ExchangeDetailView from '../views/ExchangeDetailView.vue'
-
+import MyListingsView from '../views/MyListingsView.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -39,6 +39,12 @@ const router = createRouter({
       path: '/exchanges/:id',
       name: 'exchange-detail',
       component: ExchangeDetailView
+    },
+    {
+      path: '/my-items',
+      name: 'my-listings',
+      component: MyListingsView,
+      meta: { requiresAuth: true } // 建議加上登入驗證標記 (如果你的專案有實作)
     }
   ]
 })
