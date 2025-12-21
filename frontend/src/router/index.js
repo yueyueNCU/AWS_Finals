@@ -1,9 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
-import PostItemView from '../views/PostItemView.vue'     // 新增引入
-import ItemDetailView from '../views/ItemDetailView.vue' // 新增引入
-import ProfileView from '../views/ProfileView.vue'       // 新增引入
+import PostItemView from '../views/PostItemView.vue'
+import ItemDetailView from '../views/ItemDetailView.vue'
+import ProfileView from '../views/ProfileView.vue'
+import ExchangeDetailView from '../views/ExchangeDetailView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -24,7 +25,7 @@ const router = createRouter({
       component: PostItemView
     },
     {
-      path: '/items/:id', // :id 代表動態參數
+      path: '/items/:id',
       name: 'item-detail',
       component: ItemDetailView
     },
@@ -32,6 +33,12 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: ProfileView
+    },
+    // [新增] 交換詳情頁路由
+    {
+      path: '/exchanges/:id',
+      name: 'exchange-detail',
+      component: ExchangeDetailView
     }
   ]
 })
