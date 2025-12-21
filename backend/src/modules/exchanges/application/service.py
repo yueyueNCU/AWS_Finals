@@ -179,6 +179,9 @@ class ExchangeService:
             if offered:
                 offered.status = ItemStatus.TRADING
                 self.item_repo.save(offered)
+                self._reject_related_requests_for_offered_item(
+                    exchange.offered_item_id, exchange_id
+                )
 
             # 拒絕其他請求
             self._reject_other_requests(exchange.target_item_id, exchange_id)
@@ -298,6 +301,51 @@ class ExchangeService:
             ),
             "deal_info": deal_info,
         }
+
+    def _reject_related_requests_for_offered_item(
+        self, offered_item_id: str, current_exchange_id: str
+    ):
+        """
+        當提供的物品被交易後，將其他所有使用該物品作為 offered_item 的請求，
+        以及所有以該物品為 target_item 的請求 (如果有的話) 全部拒絕。
+        """
+        # 情況 1: 找出其他 "我拿這個物品去換別人東西" 的請求 (User Case)
+        # 條件: offered_item_id 相同 AND id != current AND status = PENDING
+        outgoing_conflicts = (
+            self.db.query(ExchangeModel)
+            .filter(
+                ExchangeModel.offered_item_id == offered_item_id,
+                ExchangeModel.id != current_exchange_id,
+                ExchangeModel.status == ExchangeStatus.PENDING,
+            )
+            .all()
+        )
+
+        # 情況 2: 找出 "別人想要換我這個物品" 的請求
+        # 條件: target_item_id 相同 AND status = PENDING
+        # (因為這個物品已經拿去換別人的東西了，所以別人不能再來換它)
+        incoming_conflicts = (
+            self.db.query(ExchangeModel)
+            .filter(
+                ExchangeModel.target_item_id == offered_item_id,
+                # 這裡不需要排除 current_exchange_id，因為 current 的 target 是對方的物品
+                ExchangeModel.status == ExchangeStatus.PENDING,
+            )
+            .all()
+        )
+
+        all_conflicts = outgoing_conflicts + incoming_conflicts
+
+        for conflict in all_conflicts:
+            conflict.status = ExchangeStatus.REJECTED
+            note = " (系統自動備註: 因交換物品已用於其他交易，系統自動取消此請求)"
+            if conflict.message:
+                conflict.message += note
+            else:
+                conflict.message = note.strip()
+
+            conflict.updated_at = datetime.now()
+            self.db.add(conflict)
 
     def get_locations(self):
         return [{"id": k, "name": v} for k, v in LOCATIONS.items()]
