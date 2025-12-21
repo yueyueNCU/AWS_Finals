@@ -47,6 +47,31 @@ class ExchangeService:
             if not offered_item or offered_item.owner_id != requester_id:
                 raise HTTPException(status_code=400, detail="Invalid offered item")
 
+        from ..infrastructure.models import ExchangeModel  # 確保引入 Model 以便查詢
+
+        # 同一人 (requester) 對同一物 (target) 用同一交換物 (offered) 且還在 PENDING 狀態
+        duplicate_query = self.db.query(ExchangeModel).filter(
+            ExchangeModel.requester_id == requester_id,
+            ExchangeModel.target_item_id == target_item_id,
+            ExchangeModel.status == ExchangeStatus.PENDING,
+        )
+
+        # 分開處理 offered_item_id 為 None (純索取) 的狀況
+        if dto.offered_item_id:
+            duplicate_query = duplicate_query.filter(
+                ExchangeModel.offered_item_id == dto.offered_item_id
+            )
+        else:
+            duplicate_query = duplicate_query.filter(
+                ExchangeModel.offered_item_id == None
+            )
+
+        if duplicate_query.first():
+            raise HTTPException(
+                status_code=400,
+                detail="您已送出過相同的交換請求 (You already have a pending request with this item).",
+            )
+
         # 3. 建立交換請求
         new_exchange = Exchange(
             id=str(uuid.uuid4()),
@@ -134,6 +159,58 @@ class ExchangeService:
 
         exchange.updated_at = datetime.now()
         self.repo.save(exchange)
+        return self._enrich_exchange_data(exchange_id)
+
+    def _reject_other_requests(self, target_item_id: str, current_exchange_id: str):
+        """
+        找出所有 target_item_id 相同，且狀態為 PENDING 的其他交換請求，
+        將它們強制改為 REJECTED。
+        """
+        # 這裡直接使用 DB Session 進行批量更新比較快
+        # 邏輯：UPDATE exchanges SET status='rejected' WHERE target_item_id=... AND id != ... AND status='pending'
+
+        from ..domain.entity import ExchangeStatus
+        from ..infrastructure.models import ExchangeModel
+
+        # 查詢
+        others = (
+            self.db.query(ExchangeModel)
+            .filter(
+                ExchangeModel.target_item_id == target_item_id,
+                ExchangeModel.id != current_exchange_id,
+                ExchangeModel.status == ExchangeStatus.PENDING,
+            )
+            .all()
+        )
+
+        # 更新
+        for other in others:
+            other.status = ExchangeStatus.REJECTED  # 或者你可以新增一個狀態叫 CANCELLED
+            other.message += " (系統自動備註: 因物品已與他人成交，系統自動取消此請求)"
+            other.updated_at = datetime.now()
+            self.db.add(other)
+
+    def cancel_exchange(self, user_id: str, exchange_id: str):
+        exchange = self.repo.get_by_id(exchange_id)
+        if not exchange:
+            raise HTTPException(status_code=404, detail="Exchange not found")
+
+        # 驗證權限：只有「提出者 (Requester)」可以取消
+        if exchange.requester_id != user_id:
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+        # 驗證狀態：只有 PENDING (等待中) 的請求可以取消
+        # 如果對方已經接受了，就不能隨便取消 (可能需要聊聊協調)
+        if exchange.status != ExchangeStatus.PENDING:
+            raise HTTPException(
+                status_code=400, detail="Only pending requests can be cancelled"
+            )
+
+        # 更新狀態為 CANCELLED
+        exchange.status = ExchangeStatus.CANCELLED
+        exchange.updated_at = datetime.now()
+        self.repo.save(exchange)
+
         return self._enrich_exchange_data(exchange_id)
 
     def _enrich_exchange_data(self, exchange_id: str):
