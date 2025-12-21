@@ -45,9 +45,14 @@
         </div>
 
         <div class="form-group">
-          <label>提供交換的物品 ID (選填)</label>
-          <input v-model="offeredItemId" placeholder="如果你有刊登物品，可填入 ID" />
-          <small>未來這裡會改成下拉選單選擇你的物品</small>
+          <label>提供交換的物品 (選填)</label>
+          <select v-model="offeredItemId">
+            <option value="">(無) 純索取 / 私下協調</option>
+            <option v-for="myItem in myItems" :key="myItem.id" :value="myItem.id">
+              {{ myItem.title }}
+            </option>
+          </select>
+          <small v-if="myItems.length === 0">你目前沒有上架的物品可供交換</small>
         </div>
 
         <div class="modal-actions">
@@ -68,7 +73,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { itemsApi, exchangesApi } from '@/api';
+import { itemsApi, exchangesApi } from '@/api'; // 確保這裡有正確引入 itemsApi
 import { useAuthStore } from '@/stores/auth';
 
 const route = useRoute();
@@ -76,21 +81,23 @@ const router = useRouter();
 const authStore = useAuthStore();
 
 const item = ref(null);
+// [新增] 存放我自己的物品列表
+const myItems = ref([]);
+
 const showExchangeModal = ref(false);
 const exchangeMessage = ref('');
-const offeredItemId = ref('');
+const offeredItemId = ref(''); // 這裡會綁定 select 的值 (預設為空字串)
 const isSubmitting = ref(false);
 
-// 判斷是否為自己的物品
 const isOwner = computed(() => {
   if (!authStore.user || !item.value) return false;
   return authStore.user.id === item.value.owner_id;
 });
 
-// 1. 載入物品詳情
+// 1. 載入當前物品詳情
 const fetchItemDetail = async () => {
   try {
-    const id = route.params.id; // 從網址 /items/:id 拿到 id
+    const id = route.params.id; 
     const response = await itemsApi.getItem(id);
     item.value = response.data;
   } catch (error) {
@@ -100,7 +107,28 @@ const fetchItemDetail = async () => {
   }
 };
 
-// 2. 送出交換請求
+// [新增] 2. 載入我的物品清單 (用於下拉選單)
+// src/views/ItemDetailView.vue
+
+const fetchMyItems = async () => {
+  // 如果沒登入就不抓
+  if (!authStore.isLoggedIn) return;
+  
+  try {
+    // 1. 呼叫 API 取得物品列表
+    // 雖然我們傳了 owner_id，但後端似乎會忽略它並回傳全部物品，所以在下一步前端過濾
+    const res = await itemsApi.getItems(); 
+    
+    // 2. 在前端進行過濾：只保留 owner_id 等於目前使用者 ID 的物品
+    const allItems = res.data;
+    myItems.value = allItems.filter(item => item.owner_id === authStore.user.id);
+
+  } catch (err) {
+    console.error('Fetch my items error:', err);
+  }
+};
+
+// 3. 送出交換請求
 const submitExchange = async () => {
   if (!authStore.isLoggedIn) {
     alert('請先登入！');
@@ -116,16 +144,18 @@ const submitExchange = async () => {
   isSubmitting.value = true;
   try {
     await exchangesApi.createExchange(item.value.id, {
-      offered_item_id: offeredItemId.value || null,
+      offered_item_id: offeredItemId.value || null, // 若為空字串則轉為 null
       message: exchangeMessage.value
     });
     
     alert('交換請求已送出！請至「我的帳戶」查看狀態。');
     showExchangeModal.value = false;
-    router.push('/profile'); // 跳轉到個人頁面查看紀錄
+    router.push('/profile'); 
   } catch (error) {
     console.error(error);
-    alert('送出失敗，請稍後再試');
+    // [修改] 顯示後端回傳的詳細錯誤訊息 (例如：重複請求)
+    const errorMsg = error.response?.data?.detail || '送出失敗，請稍後再試';
+    alert(errorMsg);
   } finally {
     isSubmitting.value = false;
   }
@@ -133,10 +163,12 @@ const submitExchange = async () => {
 
 onMounted(() => {
   fetchItemDetail();
+  fetchMyItems(); // [新增] 載入頁面時順便抓取我的物品
 });
 </script>
 
 <style scoped>
+/* (原有的樣式保持不變，新增 select 的樣式) */
 .detail-container {
   display: flex;
   gap: 40px;
@@ -228,11 +260,13 @@ onMounted(() => {
   margin-bottom: 5px;
   font-weight: bold;
 }
-.form-group textarea, .form-group input {
+/* [修改] 增加 select 樣式 */
+.form-group textarea, .form-group input, .form-group select {
   width: 100%;
   padding: 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
+  background-color: #fff;
 }
 .modal-actions {
   display: flex;

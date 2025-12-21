@@ -26,6 +26,12 @@ export default {
     return apiClient.patch(`/exchanges/${id}/status`, data);
   },
 
+  // 7. 取消交換請求 (撤銷)
+  // 對應後端: @router.delete("/exchanges/{exchange_id}")
+  cancelExchange(id) {
+    return apiClient.delete(`/exchanges/${id}`);
+  },
+
   // --- 系統資訊 (地點與分類) ---
   
   // 5. 取得面交地點清單

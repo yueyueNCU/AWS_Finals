@@ -40,12 +40,26 @@
           <div class="item-pair">
             <div class="item">
               <small>對方的物品</small>
-              <h4>{{ ex.target_item?.title || '未知物品' }}</h4>
+              <h4>
+                {{ 
+                  (currentTab === 'requester' 
+                    ? ex.target_item?.title 
+                    : ex.offered_item?.title) || '（無/純索取）' 
+                }}
+              </h4>
             </div>
+
             <div class="arrow">⇄</div>
+
             <div class="item">
               <small>我的物品</small>
-              <h4>{{ ex.offered_item?.title || '（無/純索取）' }}</h4>
+              <h4>
+                {{ 
+                  (currentTab === 'requester' 
+                    ? ex.offered_item?.title 
+                    : ex.target_item?.title) || '（無/純索取）' 
+                }}
+              </h4>
             </div>
           </div>
           
@@ -55,6 +69,14 @@
         </div>
 
         <div class="card-actions">
+          <button 
+            v-if="currentTab === 'requester' && ex.status === 'pending'"
+            @click.stop="handleCancel(ex.exchange_id)" 
+            class="btn-cancel"
+          >
+            取消請求
+          </button>
+
           <button @click="viewDetail(ex.exchange_id)">查看對話與詳情</button>
         </div>
       </div>
@@ -104,6 +126,28 @@ const fetchExchanges = async () => {
   }
 };
 
+// 處理取消請求
+const handleCancel = async (exchangeId) => {
+  // 1. 跳出 Confirm 視窗
+  const isConfirmed = confirm('確定要取消這個交換請求嗎？');
+  
+  if (!isConfirmed) return;
+
+  try {
+    // 2. 呼叫 API
+    await exchangesApi.cancelExchange(exchangeId);
+    
+    // 3. 成功提示
+    alert('已成功取消請求');
+    
+    // 4. 重新整理列表 (假設你的讀取函式叫 fetchExchanges)
+    fetchExchanges(); 
+    
+  } catch (error) {
+    console.error(error);
+    alert('取消失敗，請稍後再試');
+  }
+};
 // 當 Tab 改變時，重新抓資料
 watch(currentTab, () => {
   fetchExchanges();
@@ -111,8 +155,7 @@ watch(currentTab, () => {
 
 // 進入詳情 (如果未來有做 ExchangeDetailView 的話)
 const viewDetail = (id) => {
-  // router.push(`/exchanges/${id}`);
-  alert(`功能開發中：前往交換詳情 ${id}`);
+  router.push(`/exchanges/${id}`);
 };
 
 onMounted(() => {
@@ -212,5 +255,13 @@ onMounted(() => {
   padding: 5px 10px;
   border-radius: 4px;
   cursor: pointer;
+}
+.btn-cancel {
+  background-color: #ff5252;
+  color: white;
+  margin-right: 10px; /* 與右邊的按鈕保持距離 */
+}
+.btn-cancel:hover {
+  background-color: #d32f2f;
 }
 </style>
