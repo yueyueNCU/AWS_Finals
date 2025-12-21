@@ -79,6 +79,16 @@ def update_exchange_status(
     return service.update_status(current_user.id, exchange_id, request)
 
 
+# 5. 取消交換請求 (由提出者發起)
+@router.delete("/exchanges/{exchange_id}")
+def cancel_exchange(
+    exchange_id: str,
+    current_user: User = Depends(get_current_user),
+    service: ExchangeService = Depends(get_exchange_service),
+):
+    return service.cancel_exchange(current_user.id, exchange_id)
+
+
 # 系統資訊: 地點
 @router.get("/locations")
 def get_locations(service: ExchangeService = Depends(get_exchange_service)):
