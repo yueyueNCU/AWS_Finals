@@ -35,6 +35,16 @@ class SqlAlchemyItemRepository(ItemRepository):
         # result 會是 (ItemModel, owner_name) 的 Tuple
         return self._to_entity(result[0], result[1]) if result else None
     
+    def get_by_owner_id(self, owner_id: str) -> List[Item]:
+        results = self.db.query(ItemModel, UserModel.name)\
+            .outerjoin(UserModel, ItemModel.owner_id == UserModel.id)\
+            .filter(ItemModel.owner_id == owner_id)\
+            .order_by(ItemModel.created_at.desc())\
+            .all()
+            
+        # 轉換為 Entity
+        return [self._to_entity(row[0], row[1]) for row in results]
+    
     def search(self, keyword: Optional[str], category: Optional[ItemCategory]) -> List[Item]:
         # 修改：查詢時同時選取 ItemModel 和 UserModel.name
         query = self.db.query(ItemModel, UserModel.name)\

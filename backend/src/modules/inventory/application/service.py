@@ -28,5 +28,8 @@ class ItemService:
         # 3. 存入 DB
         return self.repo.save(new_item)
 
+    def get_user_items(self, owner_id: str):
+        return self.repo.get_by_owner_id(owner_id)
+    
     def search_items(self, keyword: Optional[str] = None, category: Optional[ItemCategory] = None):
         return self.repo.search(keyword, category)

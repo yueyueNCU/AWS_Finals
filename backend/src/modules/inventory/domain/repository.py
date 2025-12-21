@@ -12,5 +12,9 @@ class ItemRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_owner_id(self, owner_id: str) -> List[Item]:
+        pass
+    
+    @abstractmethod
     def search(self, keyword: Optional[str], category: Optional[ItemCategory]) -> List[Item]:
         pass
