@@ -38,6 +38,10 @@ class ExchangeService:
         if not target_item:
             raise HTTPException(status_code=404, detail="Target item not found")
 
+        # 檢查目標物品狀態
+        if target_item.status != ItemStatus.AVAILABLE:
+            raise HTTPException(status_code=400, detail="Target item is not available")
+
         if target_item.owner_id == requester_id:
             raise HTTPException(status_code=400, detail="Cannot exchange with yourself")
 
@@ -47,7 +51,11 @@ class ExchangeService:
             if not offered_item or offered_item.owner_id != requester_id:
                 raise HTTPException(status_code=400, detail="Invalid offered item")
 
-        from ..infrastructure.models import ExchangeModel  # 確保引入 Model 以便查詢
+            # 檢查提供物品狀態
+            if offered_item.status != ItemStatus.AVAILABLE:
+                raise HTTPException(
+                    status_code=400, detail="Offered item is not available"
+                )
 
         # 同一人 (requester) 對同一物 (target) 用同一交換物 (offered) 且還在 PENDING 狀態
         duplicate_query = self.db.query(ExchangeModel).filter(
@@ -133,26 +141,47 @@ class ExchangeService:
         if not exchange:
             raise HTTPException(status_code=404, detail="Exchange not found")
 
-        # 只有擁有者(賣家)可以接受/拒絕
         if exchange.owner_id != user_id:
             raise HTTPException(status_code=403, detail="Permission denied")
 
         if dto.action == "accept":
+            # --- [Step 1] 先做所有檢查 (Check Phase) ---
+
+            # 1. 檢查我的物品 (Target)
+            target = self.item_repo.get_by_id(exchange.target_item_id)
+            if target.status != ItemStatus.AVAILABLE:
+                raise HTTPException(
+                    status_code=400, detail="Item is no longer available"
+                )
+
+            # 2. 檢查對方的物品 (Offered) - 這裡只檢查，先不存檔
+            offered = None
+            if exchange.offered_item_id:
+                offered = self.item_repo.get_by_id(exchange.offered_item_id)
+                # 若找不到物品或狀態不對，直接報錯，這時還沒修改 target，所以很安全
+                if offered and offered.status != ItemStatus.AVAILABLE:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="對方提供的物品已不再可用 (Offered item is no longer available)",
+                    )
+
+            # --- [Step 2] 檢查全部通過，才執行狀態更新 (Update Phase) ---
+
+            # 更新 Exchange
             exchange.status = ExchangeStatus.ACCEPTED
             exchange.meetup_location_id = dto.meetup_location_id
 
-            # 更新物品狀態為 "交易中" (Locked)
-            target = self.item_repo.get_by_id(exchange.target_item_id)
-            if target:
-                target.status = ItemStatus.TRADING
-                self.item_repo.save(target)
+            # 更新 Target Item
+            target.status = ItemStatus.TRADING
+            self.item_repo.save(target)
 
-            # 如果有交換物，也鎖定
-            if exchange.offered_item_id:
-                offered = self.item_repo.get_by_id(exchange.offered_item_id)
-                if offered:
-                    offered.status = ItemStatus.TRADING
-                    self.item_repo.save(offered)
+            # 更新 Offered Item (如果有)
+            if offered:
+                offered.status = ItemStatus.TRADING
+                self.item_repo.save(offered)
+
+            # 拒絕其他請求
+            self._reject_other_requests(exchange.target_item_id, exchange_id)
 
         elif dto.action == "reject":
             exchange.status = ExchangeStatus.REJECTED
@@ -169,9 +198,6 @@ class ExchangeService:
         # 這裡直接使用 DB Session 進行批量更新比較快
         # 邏輯：UPDATE exchanges SET status='rejected' WHERE target_item_id=... AND id != ... AND status='pending'
 
-        from ..domain.entity import ExchangeStatus
-        from ..infrastructure.models import ExchangeModel
-
         # 查詢
         others = (
             self.db.query(ExchangeModel)
@@ -185,8 +211,13 @@ class ExchangeService:
 
         # 更新
         for other in others:
-            other.status = ExchangeStatus.REJECTED  # 或者你可以新增一個狀態叫 CANCELLED
-            other.message += " (系統自動備註: 因物品已與他人成交，系統自動取消此請求)"
+            other.status = ExchangeStatus.REJECTED
+            note = " (系統自動備註: 因物品已與他人成交，系統自動取消此請求)"
+            if other.message:
+                other.message += note
+            else:
+                other.message = note.strip()
+
             other.updated_at = datetime.now()
             self.db.add(other)
 
