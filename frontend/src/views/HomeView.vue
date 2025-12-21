@@ -1,17 +1,17 @@
-<!-- 首頁 (搜尋 + 物品列表) -->
- <template>
+<template>
   <div class="home-container">
     <h1>物品列表</h1>
     
     <div class="filter-section">
       <input v-model="searchKeyword" placeholder="搜尋物品名稱..." @keyup.enter="fetchItems" />
+      
       <select v-model="selectedCategory" @change="fetchItems">
         <option value="">所有分類</option>
-        <option value="TEXTBOOK">教科書</option>
-        <option value="3C">3C 周邊</option>
-        <option value="DAILY">生活用品</option>
-        <option value="OTHER">其他</option>
+        <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+          {{ cat.name }}
+        </option>
       </select>
+
       <button @click="fetchItems">搜尋</button>
     </div>
 
@@ -20,7 +20,7 @@
       <div v-for="item in items" :key="item.id" class="item-card" @click="goToDetail(item.id)">
         <img :src="item.image_url || 'https://via.placeholder.com/150'" alt="item image" />
         <h3>{{ item.title }}</h3>
-        <p class="category-tag">{{ item.category }}</p>
+        <p class="category-tag">{{ getCategoryName(item.category) }}</p>
       </div>
     </div>
     
@@ -33,13 +33,24 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { itemsApi } from '@/api'; // 引入我們寫好的 API
+import { itemsApi } from '@/api'; 
 
 const router = useRouter();
 const items = ref([]);
+const categories = ref([]); // [新增] 用來存放分類清單
 const loading = ref(false);
 const searchKeyword = ref('');
 const selectedCategory = ref('');
+
+// [新增] 抓取分類清單
+const fetchCategories = async () => {
+  try {
+    const res = await itemsApi.getCategories();
+    categories.value = res.data;
+  } catch (error) {
+    console.error('無法取得分類:', error);
+  }
+};
 
 // 抓取物品列表
 const fetchItems = async () => {
@@ -50,12 +61,18 @@ const fetchItems = async () => {
     if (selectedCategory.value) params.category = selectedCategory.value;
 
     const response = await itemsApi.getItems(params);
-    items.value = response.data; // 假設後端直接回傳 list，或是 response.data.items
+    items.value = response.data;
   } catch (error) {
-    console.error('抓取失敗', error);
+    console.error('抓取物品失敗', error);
   } finally {
     loading.value = false;
   }
+};
+
+// [新增] 輔助函式：將分類代碼轉為中文名稱 (用於卡片顯示)
+const getCategoryName = (code) => {
+  const target = categories.value.find(c => c.id === code);
+  return target ? target.name : code;
 };
 
 // 跳轉到詳情頁
@@ -63,13 +80,14 @@ const goToDetail = (id) => {
   router.push(`/items/${id}`);
 };
 
-// 畫面載入時自動抓一次
 onMounted(() => {
-  fetchItems();
+  fetchCategories(); // [新增] 先抓分類
+  fetchItems();      // 再抓物品
 });
 </script>
 
 <style scoped>
+/* 原有樣式保持不變 */
 .home-container {
   padding: 20px;
 }
