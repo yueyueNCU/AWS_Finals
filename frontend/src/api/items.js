@@ -13,6 +13,11 @@ export default {
     return apiClient.get(`/items/${id}`);
   },
 
+  // 取得我刊登的物品
+  getMyItems() {
+    return apiClient.get('/items/me');
+  },
+
   // 3. 刊登物品 (需要上傳圖片，所以要用 FormData)
   createItem(data) {
     const formData = new FormData();

@@ -8,6 +8,8 @@
       <RouterLink to="/">首頁</RouterLink>
       <RouterLink to="/post">我要刊登</RouterLink>
       
+      <RouterLink v-if="authStore.isLoggedIn" to="/my-items">我的物品</RouterLink>
+      
       <div v-if="authStore.isLoggedIn" class="user-menu">
         <RouterLink to="/profile">
           <span class="user-name">你好，{{ authStore.user?.name || '同學' }}</span>
@@ -28,30 +30,19 @@ import { useAuthStore } from '@/stores/auth';
 
 const authStore = useAuthStore();
 
-// 觸發登入：跳轉到 AWS Cognito Hosted UI
+// (handleLogin 函式保持不變...)
 const handleLogin = () => {
-  // *** 請跟你的 AWS 組員拿這些資訊 ***
-  // 1. Cognito Domain (例如: https://ncu-project.auth.us-east-1.amazoncognito.com)
   const cognitoDomain = 'https://ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com'; 
-  
-  // 2. App Client ID (一串亂碼)
   const clientId = '3e01cbi503u29lb0jpm62ospm4' ; 
-  
   const baseUrl = import.meta.env.VITE_APP_BASE_URL;
-
-  // 3. Callback URL (必須跟 AWS 後台設定的一模一樣)
-  // 本機開發通常是: http://localhost:5173/callback
   const redirectUri = encodeURIComponent(`${baseUrl}/callback/`);
-
-  // 4. 拼湊出登入網址
   const loginUrl = `${cognitoDomain}/login?client_id=${clientId}&response_type=code&scope=email+openid+profile&redirect_uri=${redirectUri}`;
-
-  // 5. 轉址
   window.location.href = loginUrl;
 };
 </script>
 
 <style scoped>
+/* (樣式保持不變) */
 .navbar {
   display: flex;
   justify-content: space-between;

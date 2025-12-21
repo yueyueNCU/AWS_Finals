@@ -4,7 +4,11 @@ from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-
+from .dtos import (
+    CreateExchangeRequest,
+    UpdateExchangeStatusRequest,
+    ExchangeDetailResponse
+)
 from ...inventory.domain.entity import ItemStatus
 
 # 假設你需要存取 Items 來檢查擁有權或更新狀態
