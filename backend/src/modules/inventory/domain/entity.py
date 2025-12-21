@@ -27,3 +27,4 @@ class Item:
     status: ItemStatus
     image_url: Optional[str] = None
     created_at: datetime = datetime.now()
+    owner_name: Optional[str] = None

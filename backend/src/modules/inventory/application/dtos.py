@@ -6,6 +6,7 @@ from ..domain.entity import ItemCategory, ItemStatus
 class ItemResponse(BaseModel):
     id: str
     owner_id: str
+    owner_name: str
     title: str
     description: str
     category: ItemCategory
