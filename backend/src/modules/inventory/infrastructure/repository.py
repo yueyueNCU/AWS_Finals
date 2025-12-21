@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from ..domain.entity import Item, ItemCategory, ItemStatus
 from ..domain.repository import ItemRepository
 from .models import ItemModel
+from ...iam.infrastructure.models import UserModel
 
 class SqlAlchemyItemRepository(ItemRepository):
     def __init__(self, db: Session):
@@ -25,26 +26,36 @@ class SqlAlchemyItemRepository(ItemRepository):
         return item
 
     def get_by_id(self, item_id: str) -> Optional[Item]:
-        model = self.db.query(ItemModel).filter(ItemModel.id == item_id).first()
-        return self._to_entity(model) if model else None
-
+        # 修改：加入 Join UserModel 並選取 UserModel.name
+        result = self.db.query(ItemModel, UserModel.name)\
+            .outerjoin(UserModel, ItemModel.owner_id == UserModel.id)\
+            .filter(ItemModel.id == item_id)\
+            .first()
+            
+        # result 會是 (ItemModel, owner_name) 的 Tuple
+        return self._to_entity(result[0], result[1]) if result else None
+    
     def search(self, keyword: Optional[str], category: Optional[ItemCategory]) -> List[Item]:
-        query = self.db.query(ItemModel).filter(ItemModel.status == ItemStatus.AVAILABLE)
+        # 修改：查詢時同時選取 ItemModel 和 UserModel.name
+        query = self.db.query(ItemModel, UserModel.name)\
+            .outerjoin(UserModel, ItemModel.owner_id == UserModel.id)\
+            .filter(ItemModel.status == ItemStatus.AVAILABLE)
         
         if category:
             query = query.filter(ItemModel.category == category)
         
         if keyword:
-            # 簡單的模糊搜尋
             query = query.filter(ItemModel.title.ilike(f"%{keyword}%"))
             
-        models = query.all()
-        return [self._to_entity(m) for m in models]
+        results = query.all()
+        # results 是 List[(ItemModel, owner_name)]
+        return [self._to_entity(row[0], row[1]) for row in results]
 
-    def _to_entity(self, model: ItemModel) -> Item:
+    def _to_entity(self, model: ItemModel, owner_name: Optional[str] = None) -> Item:
         return Item(
             id=model.id,
             owner_id=model.owner_id,
+            owner_name=owner_name,
             title=model.title,
             description=model.description,
             category=ItemCategory(model.category),
