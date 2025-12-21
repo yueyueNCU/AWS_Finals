@@ -115,6 +115,37 @@ def get_my_items(
     return service.get_user_items(current_user.id)
 
 # ---------------------------------------------
+# [新增] 取得物品分類清單 (從 Exchanges 搬過來的)
+# ⚠️ 注意：這必須放在 get_item (/{item_id}) 之前！
+# ---------------------------------------------
+@router.get(
+    "/categories", 
+    response_model=List[dict],
+    summary="取得物品分類清單"
+)
+def get_categories():
+    """
+    從 ItemCategory Enum 動態產生分類清單。
+    """
+    # 定義中文名稱對照
+    CATEGORY_MAP = {
+        ItemCategory.TEXTBOOK: "教科書",
+        ItemCategory.ELECTRONICS: "3C周邊",
+        ItemCategory.DAILY_USE: "生活用品",
+        ItemCategory.FOODSTUFF: "食品",
+        ItemCategory.FURNITURE: "家具",
+        ItemCategory.OTHER: "其他",
+    }
+    
+    return [
+        {
+            "id": category.value,
+            "name": CATEGORY_MAP.get(category, category.value)
+        }
+        for category in ItemCategory
+    ]
+
+# ---------------------------------------------
 # 4. 取得單一物品詳情 (Get Item Detail)
 # ---------------------------------------------
 @router.get(

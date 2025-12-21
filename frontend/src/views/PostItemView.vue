@@ -12,10 +12,9 @@
         <label>分類</label>
         <select v-model="form.category" required>
           <option value="" disabled>請選擇分類</option>
-          <option value="TEXTBOOK">教科書</option>
-          <option value="3C">3C 周邊</option>
-          <option value="DAILY">生活用品</option>
-          <option value="OTHER">其他</option>
+          <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+            {{ cat.name }}
+          </option>
         </select>
       </div>
 
@@ -40,38 +39,48 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue'; // [新增] 引入 onMounted
 import { useRouter } from 'vue-router';
 import { itemsApi } from '@/api';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const categories = ref([]); // [新增] 用來存放分類清單
 
 // 表單資料
 const form = reactive({
   title: '',
   category: '',
   description: '',
-  image: null // 存放 File 物件
+  image: null 
 });
 
 const previewUrl = ref(null);
 const isSubmitting = ref(false);
+
+// [新增] 抓取分類清單
+const fetchCategories = async () => {
+  try {
+    const res = await itemsApi.getCategories();
+    categories.value = res.data;
+  } catch (error) {
+    console.error('無法取得分類:', error);
+    alert('無法載入分類選項，請稍後再試');
+  }
+};
 
 // 處理檔案選擇
 const handleFileChange = (event) => {
   const file = event.target.files[0];
   if (file) {
     form.image = file;
-    // 建立預覽圖
     previewUrl.value = URL.createObjectURL(file);
   }
 };
 
 // 送出表單
 const handleSubmit = async () => {
-  // 簡單檢查是否有登入
   if (!authStore.isLoggedIn) {
     alert('請先登入才能刊登物品！');
     return;
@@ -79,7 +88,6 @@ const handleSubmit = async () => {
 
   isSubmitting.value = true;
   try {
-    // 呼叫我們封裝好的 API (會自動轉成 FormData)
     await itemsApi.createItem({
       title: form.title,
       description: form.description,
@@ -88,7 +96,7 @@ const handleSubmit = async () => {
     });
 
     alert('刊登成功！');
-    router.push('/'); // 回到首頁
+    router.push('/'); 
   } catch (error) {
     console.error(error);
     alert('刊登失敗，請稍後再試。');
@@ -96,9 +104,15 @@ const handleSubmit = async () => {
     isSubmitting.value = false;
   }
 };
+
+// [新增] 畫面載入時抓取分類
+onMounted(() => {
+  fetchCategories();
+});
 </script>
 
 <style scoped>
+/* 樣式保持不變 */
 .post-container {
   max-width: 600px;
   margin: 0 auto;

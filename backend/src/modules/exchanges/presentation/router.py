@@ -99,17 +99,17 @@ def get_locations(service: ExchangeService = Depends(get_exchange_service)):
 from ...inventory.domain.entity import ItemCategory
 
 
-@router.get("/categories")
-def get_categories():
-    # 對應前端要求的中文，這裡做個 Mapping
-    CATEGORY_MAP = {
-        ItemCategory.TEXTBOOK: "教科書",
-        ItemCategory.ELECTRONICS: "3C周邊",
-        ItemCategory.DAILY_USE: "生活用品",
-        ItemCategory.FOODSTUFF: "食品",
-        ItemCategory.FURNITURE: "家具",
-        ItemCategory.OTHER: "其他",
-    }
-    # 或者直接回傳 Enum 值讓前端翻譯，看你的需求
-    # 這裡依照你的範例回傳 List[str]
-    return list(CATEGORY_MAP.values())
+# @router.get("/categories")
+# def get_categories():
+#     # 對應前端要求的中文，這裡做個 Mapping
+#     CATEGORY_MAP = {
+#         ItemCategory.TEXTBOOK: "教科書",
+#         ItemCategory.ELECTRONICS: "3C周邊",
+#         ItemCategory.DAILY_USE: "生活用品",
+#         ItemCategory.FOODSTUFF: "食品",
+#         ItemCategory.FURNITURE: "家具",
+#         ItemCategory.OTHER: "其他",
+#     }
+#     # 或者直接回傳 Enum 值讓前端翻譯，看你的需求
+#     # 這裡依照你的範例回傳 List[str]
+#     return list(CATEGORY_MAP.values())
