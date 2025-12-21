@@ -92,7 +92,28 @@ def search_items(
     return service.search_items(keyword, category)
 
 # ---------------------------------------------
-# 3. 取得單一物品詳情 (Get Item Detail)
+# 3. 取得目前登入使用者的所有物品 (包含歷史狀態)
+# ---------------------------------------------
+@router.get(
+    "/me", 
+    response_model=List[ItemResponse],
+    summary="取得我的物品清單 (含歷史紀錄)"
+)
+def get_my_items(
+    current_user: User = Depends(get_current_user),
+    service: ItemService = Depends(get_item_service)
+):
+    """
+    取得當前登入使用者刊登過的所有物品，包含：
+    - AVAILABLE (上架中)
+    - TRADING (交易洽談中)
+    - TRADED (已交換)
+    - HIDDEN (下架)
+    """
+    return service.get_user_items(current_user.id)
+
+# ---------------------------------------------
+# 4. 取得單一物品詳情 (Get Item Detail)
 # ---------------------------------------------
 @router.get(
     "/{item_id}", 
