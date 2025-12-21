@@ -141,38 +141,46 @@ class ExchangeService:
         if not exchange:
             raise HTTPException(status_code=404, detail="Exchange not found")
 
-        # 只有擁有者(賣家)可以接受/拒絕
         if exchange.owner_id != user_id:
             raise HTTPException(status_code=403, detail="Permission denied")
 
         if dto.action == "accept":
-            # 再次確認物品狀態是否仍為 Available，避免並發問題
+            # --- [Step 1] 先做所有檢查 (Check Phase) ---
+
+            # 1. 檢查我的物品 (Target)
             target = self.item_repo.get_by_id(exchange.target_item_id)
             if target.status != ItemStatus.AVAILABLE:
                 raise HTTPException(
                     status_code=400, detail="Item is no longer available"
                 )
 
-            exchange.status = ExchangeStatus.ACCEPTED
-            exchange.meetup_location_id = dto.meetup_location_id
-
-            # 更新物品狀態
-            target.status = ItemStatus.TRADING
-            self.item_repo.save(target)
-
+            # 2. 檢查對方的物品 (Offered) - 這裡只檢查，先不存檔
+            offered = None
             if exchange.offered_item_id:
                 offered = self.item_repo.get_by_id(exchange.offered_item_id)
-                # 也要檢查 offered item 是否還在
-                if offered and offered.status == ItemStatus.AVAILABLE:
-                    offered.status = ItemStatus.TRADING
-                    self.item_repo.save(offered)
-                elif offered:
+                # 若找不到物品或狀態不對，直接報錯，這時還沒修改 target，所以很安全
+                if offered and offered.status != ItemStatus.AVAILABLE:
                     raise HTTPException(
                         status_code=400,
                         detail="對方提供的物品已不再可用 (Offered item is no longer available)",
                     )
 
-            # 拒絕其他人的請求
+            # --- [Step 2] 檢查全部通過，才執行狀態更新 (Update Phase) ---
+
+            # 更新 Exchange
+            exchange.status = ExchangeStatus.ACCEPTED
+            exchange.meetup_location_id = dto.meetup_location_id
+
+            # 更新 Target Item
+            target.status = ItemStatus.TRADING
+            self.item_repo.save(target)
+
+            # 更新 Offered Item (如果有)
+            if offered:
+                offered.status = ItemStatus.TRADING
+                self.item_repo.save(offered)
+
+            # 拒絕其他請求
             self._reject_other_requests(exchange.target_item_id, exchange_id)
 
         elif dto.action == "reject":
