@@ -4,11 +4,7 @@ from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from .dtos import (
-    CreateExchangeRequest,
-    UpdateExchangeStatusRequest,
-    ExchangeDetailResponse
-)
+
 from ...inventory.domain.entity import ItemStatus
 
 # 假設你需要存取 Items 來檢查擁有權或更新狀態
@@ -20,7 +16,12 @@ from ..domain.repository import ExchangeRepository
 
 # 為了組裝回應，這裡我們可能需要直接存取 DB Model 或是使用各模組的 Repository
 # 為了簡化範例，這裡假設 Service 可以存取 DB Session 做關聯查詢 (更進階做法是透過 ReadModel)
-from ..infrastructure.models import ExchangeModel
+from ..infrastructure.models import ExchangeModel, MessageModel
+from .dtos import (
+    CreateExchangeRequest,
+    ExchangeDetailResponse,
+    UpdateExchangeStatusRequest,
+)
 
 # 地點清單 (暫時寫死，也可以存資料庫)
 LOCATIONS = {1: "正門圓環", 2: "男九舍全家", 3: "依仁堂籃球場"}
@@ -229,25 +230,43 @@ class ExchangeService:
             self.db.add(other)
 
     def cancel_exchange(self, user_id: str, exchange_id: str):
-        exchange = self.repo.get_by_id(exchange_id)
-        if not exchange:
+        exchange_model = (
+            self.db.query(ExchangeModel).filter(ExchangeModel.id == exchange_id).first()
+        )
+        if not exchange_model:
             raise HTTPException(status_code=404, detail="Exchange not found")
 
-        # 驗證權限：只有「提出者 (Requester)」可以取消
-        if exchange.requester_id != user_id:
+        if user_id not in [exchange_model.requester_id, exchange_model.owner_id]:
             raise HTTPException(status_code=403, detail="Permission denied")
 
-        # 驗證狀態：只有 PENDING (等待中) 的請求可以取消
-        # 如果對方已經接受了，就不能隨便取消 (可能需要聊聊協調)
-        if exchange.status != ExchangeStatus.PENDING:
+        # 允許 PENDING 或 ACCEPTED 狀態取消
+        if exchange_model.status not in [
+            ExchangeStatus.PENDING,
+            ExchangeStatus.ACCEPTED,
+        ]:
             raise HTTPException(
-                status_code=400, detail="Only pending requests can be cancelled"
+                status_code=400, detail="Cannot cancel completed or rejected exchanges"
             )
 
-        # 更新狀態為 CANCELLED
-        exchange.status = ExchangeStatus.CANCELLED
-        exchange.updated_at = datetime.now()
-        self.repo.save(exchange)
+        # 如果是 ACCEPTED (交易中) 狀態取消，需要還原物品狀態
+        if exchange_model.status == ExchangeStatus.ACCEPTED:
+            # 還原 target item
+            target = self.item_repo.get_by_id(exchange_model.target_item_id)
+            if target:
+                target.status = ItemStatus.AVAILABLE
+                self.db.add(target)
+
+            # 還原 offered item (如果有)
+            if exchange_model.offered_item_id:
+                offered = self.item_repo.get_by_id(exchange_model.offered_item_id)
+                if offered:
+                    offered.status = ItemStatus.AVAILABLE
+                    self.db.add(offered)
+
+        # 更新狀態
+        exchange_model.status = ExchangeStatus.CANCELLED
+        exchange_model.updated_at = datetime.now()
+        self.db.commit()
 
         return self._enrich_exchange_data(exchange_id)
 
@@ -275,6 +294,8 @@ class ExchangeService:
         return {
             "id": model.id,
             "status": model.status,
+            "requester_confirmed": model.requester_confirmed,
+            "owner_confirmed": model.owner_confirmed,
             "created_at": model.created_at,
             "updated_at": model.updated_at,
             "message": model.message,
@@ -353,3 +374,84 @@ class ExchangeService:
 
     def get_locations(self):
         return [{"id": k, "name": v} for k, v in LOCATIONS.items()]
+
+    def send_message(self, user_id: str, exchange_id: str, content: str):
+        exchange = self.repo.get_by_id(exchange_id)
+        if not exchange:
+            raise HTTPException(status_code=404, detail="Exchange not found")
+
+        # 驗證使用者是否為交換雙方之一
+        if user_id not in [exchange.requester_id, exchange.owner_id]:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        # 建立訊息
+        new_msg = MessageModel(
+            exchange_id=exchange_id, sender_id=user_id, content=content
+        )
+        self.db.add(new_msg)
+        self.db.commit()
+        self.db.refresh(new_msg)
+        return new_msg
+
+    def get_messages(self, user_id: str, exchange_id: str):
+        # 驗證權限
+        exchange = self.repo.get_by_id(exchange_id)
+        if not exchange or user_id not in [exchange.requester_id, exchange.owner_id]:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        # 查詢訊息 (依時間排序)
+        messages = (
+            self.db.query(MessageModel)
+            .filter(MessageModel.exchange_id == exchange_id)
+            .order_by(MessageModel.created_at.asc())
+            .all()
+        )
+
+        # 轉換格式 (包含 sender_name 方便前端顯示)
+        results = []
+        for msg in messages:
+            sender_name = msg.sender.name if msg.sender else "Unknown"
+            results.append(
+                {
+                    "id": msg.id,
+                    "sender_id": msg.sender_id,
+                    "sender_name": sender_name,
+                    "content": msg.content,
+                    "created_at": msg.created_at,
+                }
+            )
+        return results
+
+    # --- [新功能 2] 雙方確認完成 ---
+    def confirm_exchange(self, user_id: str, exchange_id: str):
+        # 使用 DB Model 比較方便直接修改 Boolean 欄位
+        exchange_model = (
+            self.db.query(ExchangeModel).filter(ExchangeModel.id == exchange_id).first()
+        )
+        if not exchange_model:
+            raise HTTPException(status_code=404, detail="Exchange not found")
+
+        if exchange_model.status != ExchangeStatus.ACCEPTED:
+            raise HTTPException(
+                status_code=400, detail="Exchange is not in trading status"
+            )
+
+        # 更新確認旗標
+        if user_id == exchange_model.requester_id:
+            exchange_model.requester_confirmed = True
+        elif user_id == exchange_model.owner_id:
+            exchange_model.owner_confirmed = True
+        else:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        # 檢查是否雙方都已確認
+        if exchange_model.requester_confirmed and exchange_model.owner_confirmed:
+            exchange_model.status = ExchangeStatus.COMPLETED
+
+            # TODO: 更新物品狀態為 "SOLD" 或 "COMPLETED" (視你的 ItemStatus 定義而定)
+            # self._mark_items_as_sold(exchange_model.target_item_id, exchange_model.offered_item_id)
+
+        exchange_model.updated_at = datetime.now()
+        self.db.commit()
+
+        return self._enrich_exchange_data(exchange_id)

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime
+from sqlalchemy import Boolean, Column, DateTime
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,6 +32,12 @@ class ExchangeModel(Base):
     message: Mapped[str] = mapped_column(Text, nullable=True)
     meetup_location_id: Mapped[int] = mapped_column(Integer, nullable=True)
 
+    requester_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    owner_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    messages = relationship(
+        "MessageModel", backref="exchange", cascade="all, delete-orphan"
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now, onupdate=datetime.now
@@ -42,3 +48,18 @@ class ExchangeModel(Base):
     owner = relationship("UserModel", foreign_keys=[owner_id])
     target_item = relationship("ItemModel", foreign_keys=[target_item_id])
     offered_item = relationship("ItemModel", foreign_keys=[offered_item_id])
+
+
+class MessageModel(Base):
+    __tablename__ = "exchange_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    exchange_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("exchanges.id"), index=True
+    )
+    sender_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"))
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+
+    # 關聯 (Optional)
+    sender = relationship("UserModel")
