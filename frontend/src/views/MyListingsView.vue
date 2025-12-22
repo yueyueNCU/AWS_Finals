@@ -70,7 +70,7 @@ const loading = ref(true);
 
 // 狀態翻譯對照
 const translateStatus = (status) => {
-  const map = { AVAILABLE: '上架中', TRADING: '交易中', COMPLETED: '已完成' };
+  const map = { AVAILABLE: '上架中', TRADING: '交易中', TRADED: '已完成' };
   return map[status] || status;
 };
 
@@ -204,7 +204,7 @@ h1 { margin-bottom: 30px; color: #333; }
 .badge { padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; }
 .badge.AVAILABLE { background: #e3f2fd; color: #1976d2; }
 .badge.TRADING { background: #fff3e0; color: #f57c00; }
-.badge.COMPLETED { background: #e8f5e9; color: #388e3c; }
+.badge.TRADED { background: #e8f5e9; color: #388e3c; }
 
 .partner { margin: 0; color: #333; }
 .deal-status { color: #666; font-size: 0.85rem; margin-top: 2px; }
