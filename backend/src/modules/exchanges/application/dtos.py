@@ -49,7 +49,7 @@ class ExchangeListPartner(BaseModel):
 
 class ExchangeListItem(BaseModel):
     title: str
-    # 如果前端需要圖片或其他資訊，也可以加在這裡
+    item_id: str
 
 
 class ExchangeListResponse(BaseModel):
@@ -71,6 +71,8 @@ class ExchangeDetailResponse(BaseModel):
     offered_item: Optional[ItemInfo]
     deal_info: Optional[DealInfo]
     message: Optional[str]
+    requester_confirmed: bool
+    owner_confirmed: bool
 
 
 class SendMessageRequest(BaseModel):

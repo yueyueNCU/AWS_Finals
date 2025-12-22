@@ -21,6 +21,8 @@ class SqlAlchemyExchangeRepository(ExchangeRepository):
             status=exchange.status,
             message=exchange.message,
             meetup_location_id=exchange.meetup_location_id,
+            requester_confirmed=exchange.requester_confirmed,
+            owner_confirmed=exchange.owner_confirmed,
             created_at=exchange.created_at,
             updated_at=exchange.updated_at,
         )
@@ -55,6 +57,8 @@ class SqlAlchemyExchangeRepository(ExchangeRepository):
             status=ExchangeStatus(model.status),
             message=model.message,
             meetup_location_id=model.meetup_location_id,
+            requester_confirmed=model.requester_confirmed,
+            owner_confirmed=model.owner_confirmed,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )

@@ -55,10 +55,9 @@ export default {
   },
 
   // 確認交易完成
-  confirmExchange(exchangeId) {
-    return apiClient.post(`/exchanges/${exchangeId}/confirm`);
+  confirmExchange(exchangeId, data = {}) {
+    return apiClient.post(`/exchanges/${exchangeId}/confirm`, data);
   },
-
   // 更新交易地點
   updateLocation(id, locationId) {
     return apiClient.patch(`/exchanges/${id}/location`, { meetup_location_id: locationId });
