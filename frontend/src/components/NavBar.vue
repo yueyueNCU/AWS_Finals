@@ -1,18 +1,18 @@
 <template>
   <nav class="navbar">
     <div class="logo">
-      <RouterLink to="/">中央以物易物</RouterLink>
+      <RouterLink to="/">物物阿阿！</RouterLink>
     </div>
 
     <div class="links">
       <RouterLink to="/">首頁</RouterLink>
       <RouterLink to="/post">我要刊登</RouterLink>
-      
+
       <RouterLink v-if="authStore.isLoggedIn" to="/my-items">我的物品</RouterLink>
-      
+
       <div v-if="authStore.isLoggedIn" class="user-menu">
         <RouterLink to="/profile">
-          <span class="user-name">你好，{{ authStore.user?.name || '同學' }}</span>
+          <span class="user-name">你好，{{ authStore.user?.name || "同學" }}</span>
         </RouterLink>
         <button @click="authStore.logout" class="btn-logout">登出</button>
       </div>
@@ -25,15 +25,15 @@
 </template>
 
 <script setup>
-import { RouterLink } from 'vue-router';
-import { useAuthStore } from '@/stores/auth';
+import { RouterLink } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
 
 // (handleLogin 函式保持不變...)
 const handleLogin = () => {
-  const cognitoDomain = 'https://ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com'; 
-  const clientId = '3e01cbi503u29lb0jpm62ospm4' ; 
+  const cognitoDomain = "https://ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com";
+  const clientId = "3e01cbi503u29lb0jpm62ospm4";
   const baseUrl = import.meta.env.VITE_APP_BASE_URL;
   const redirectUri = encodeURIComponent(`${baseUrl}/callback/`);
   const loginUrl = `${cognitoDomain}/login?client_id=${clientId}&response_type=code&scope=email+openid+profile&redirect_uri=${redirectUri}`;
@@ -49,7 +49,7 @@ const handleLogin = () => {
   align-items: center;
   padding: 1rem 2rem;
   background-color: #ffffff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 .logo a {
   font-size: 1.5rem;

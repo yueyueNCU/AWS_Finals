@@ -1,60 +1,76 @@
 <template>
-  <div class="container">
-    <h1>我的物品管理</h1>
-    
-    <div v-if="loading" class="loading">載入中...</div>
-    
-    <div v-else-if="myItems.length === 0" class="empty-state">
-      <p>你還沒有刊登任何物品。</p>
-      <router-link to="/post" class="btn-primary">立即刊登</router-link>
+  <div class="page-container">
+    <div class="header-section">
+      <h1>我的物品管理</h1>
+      <p class="subtitle">管理您刊登的物品，查看收到的交換請求。</p>
     </div>
 
-    <div v-else class="listings-table">
-      <div class="table-header">
-        <div class="col-info">物品資訊</div>
-        <div class="col-status">狀態</div>
-        <div class="col-deal">交易紀錄 / 對象</div>
-        <div class="col-action">操作</div>
-      </div>
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>正在載入您的物品...</p>
+    </div>
 
-      <div v-for="item in myItems" :key="item.id" class="table-row">
-        <div class="col-info">
-          <img :src="item.image_url || 'https://via.placeholder.com/80'" class="thumb" />
-          <div class="text">
-            <h4>{{ item.title }}</h4>
-            <span class="date">刊登於 {{ new Date(item.created_at).toLocaleDateString() }}</span>
+    <div v-else-if="myItems.length === 0" class="empty-state">
+      <span class="empty-icon">📦</span>
+      <h3>你還沒有刊登任何物品</h3>
+      <p>將閒置的物品放上來，換取你需要的東西吧！</p>
+      <router-link to="/post" class="btn-primary">立即刊登物品</router-link>
+    </div>
+
+    <div v-else class="listings-container">
+      <div v-for="item in myItems" :key="item.id" class="listing-card">
+        <div class="info-section">
+          <div class="img-wrapper">
+            <img :src="item.image_url || 'https://via.placeholder.com/150'" alt="Item" />
+          </div>
+          <div class="text-content">
+            <h3 class="item-title">{{ item.title }}</h3>
+            <div class="meta-row">
+              <span class="date-tag">{{ formatDate(item.created_at) }}</span>
+            </div>
           </div>
         </div>
 
-        <div class="col-status">
-          <span class="badge" :class="item.status">{{ translateStatus(item.status) }}</span>
+        <div class="status-section">
+          <span class="status-badge" :class="item.status">
+            {{ translateStatus(item.status) }}
+          </span>
         </div>
 
-        <div class="col-deal">
-          <template v-if="item.activeExchange">
-            <p class="partner">
-              交易對象: <strong>{{ item.activeExchange.partner.name }}</strong>
-            </p>
-            <p class="deal-status">
-               ({{ translateExchangeStatus(item.activeExchange.status) }})
-            </p>
-            <router-link :to="`/exchanges/${item.activeExchange.exchange_id}`" class="link">
+        <div class="deal-section">
+          <div
+            v-if="item.activeExchange"
+            class="active-deal-box"
+            :class="item.activeExchange.status"
+          >
+            <span class="deal-icon">🤝</span>
+            <div class="deal-info">
+              <span class="label">
+                {{ item.activeExchange.status === "completed" ? "已成交" : "交易進行中" }}
+              </span>
+              <span class="partner-name">對象: {{ item.activeExchange.partner_name }}</span>
+            </div>
+            <router-link :to="`/exchanges/${item.activeExchange.id}`" class="btn-check-deal">
               查看詳情
             </router-link>
-          </template>
-          
-          <template v-else>
-            <span class="text-muted">尚無成交紀錄</span>
-            <p v-if="item.requestCount > 0" class="pending-count">
-              有 {{ item.requestCount }} 個等待中的請求
-            </p>
-          </template>
+          </div>
+
+          <div v-else-if="item.requestCount > 0" class="pending-requests-box">
+            <span class="notification-icon">🔔</span>
+            <div class="request-info">
+              <span class="count">{{ item.requestCount }} 個交換請求</span>
+              <span class="hint">等待您的回覆</span>
+            </div>
+            <router-link to="/profile" class="btn-check-requests"> 前往審核 </router-link>
+          </div>
+
+          <div v-else class="no-activity">
+            <span class="quiet-text">尚無交換請求</span>
+          </div>
         </div>
 
-        <div class="col-action">
-          <router-link :to="`/items/${item.id}`" class="btn-view">
-            查看頁面
-          </router-link>
+        <div class="action-section">
+          <router-link :to="`/items/${item.id}`" class="btn-view"> 預覽頁面 </router-link>
         </div>
       </div>
     </div>
@@ -62,59 +78,84 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { itemsApi, exchangesApi } from '@/api';
+import { ref, onMounted } from "vue";
+import { itemsApi, exchangesApi } from "@/api";
+import { useAuthStore } from "@/stores/auth";
 
+const authStore = useAuthStore();
 const myItems = ref([]);
 const loading = ref(true);
 
-// 狀態翻譯對照
 const translateStatus = (status) => {
-  const map = { AVAILABLE: '上架中', TRADING: '交易中', TRADED: '已完成' };
-  return map[status] || status;
+  const map = { available: "上架中", exchanged: "已交換", reserved: "洽談中", closed: "已關閉" };
+  // 後端可能回傳大寫，做個相容
+  const key = status?.toLowerCase();
+  return map[key] || status;
 };
 
-const translateExchangeStatus = (status) => {
-  const map = { pending: '等待中', accepted: '已接受', completed: '已完成' };
-  return map[status] || status;
+const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  return new Date(dateStr).toLocaleDateString();
 };
 
 const fetchData = async () => {
+  if (!authStore.user) {
+    loading.value = false;
+    return;
+  }
+
   loading.value = true;
   try {
-    // 平行呼叫兩支 API
+    // 平行呼叫：我的物品 & 別人對我的請求
+    // 注意：getExchanges('owner') 取得的是「別人對我的物品發出的請求」
     const [itemsRes, exchangesRes] = await Promise.all([
-      itemsApi.getMyItems(),
-      exchangesApi.getExchanges('owner') // 取得別人對我的請求
+      itemsApi.getMyItems ? itemsApi.getMyItems() : itemsApi.getItems(), // 相容處理
+      exchangesApi.getExchanges("owner"),
     ]);
 
-    const items = itemsRes.data;
-    const exchanges = exchangesRes.data;
+    // 若 API 是 getItems (全部)，需手動過濾出自己的
+    let items = itemsRes.data;
+    if (!itemsApi.getMyItems) {
+      items = items.filter((i) => i.owner_id === authStore.user.id);
+    }
 
-    // 資料整合：把交換資訊「掛」到物品上
-    myItems.value = items.map(item => {
-      // 1. 找出這個物品所有相關的請求
-      const relatedExchanges = exchanges.filter(ex => ex.target_item.item_id === item.id);
-      
-      // 2. 找出是否有「進行中 (Accepted)」或是「已完成 (Completed)」的交易
-      //    這代表這個物品目前的 "Active Deal"
-      // const activeExchange = relatedExchanges.find(ex => 
-      //   ['accepted', 'completed', 'trading'].includes(ex.status)
-      // );
+    const allExchanges = exchangesRes.data;
 
-      // 3. 計算有多少個 Pending 請求
-      const requestCount = relatedExchanges.filter(ex => ex.status === 'pending').length;
+    // 資料整合
+    myItems.value = items.map((item) => {
+      // 找出針對此物品的請求
+      const relatedExchanges = allExchanges.filter(
+        (ex) => ex.target_item?.id === item.id || ex.target_item_id === item.id
+      );
+
+      // 找出 Active Deal (Accepted 或 Completed)
+      // 注意後端欄位結構，這裡做些防呆
+      const activeExchange = relatedExchanges.find((ex) =>
+        ["accepted", "completed"].includes(ex.status)
+      );
+
+      // 整理 Active Exchange 的顯示資料
+      let activeExchangeData = null;
+      if (activeExchange) {
+        activeExchangeData = {
+          id: activeExchange.id,
+          status: activeExchange.status,
+          // 嘗試抓取對方的名字
+          partner_name: activeExchange.requester?.name || activeExchange.requester_name || "對方",
+        };
+      }
+
+      // 計算 Pending 數量
+      const requestCount = relatedExchanges.filter((ex) => ex.status === "pending").length;
 
       return {
         ...item,
-        // activeExchange, // 綁定成交資訊
-        requestCount    // 綁定請求數量
+        activeExchange: activeExchangeData,
+        requestCount,
       };
     });
-
   } catch (error) {
-    console.error(error);
-    alert('載入失敗');
+    console.error("Data fetch error:", error);
   } finally {
     loading.value = false;
   }
@@ -126,93 +167,317 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
-h1 { margin-bottom: 30px; color: #333; }
-
-/* 表格排版 */
-.listings-table { border: 1px solid #eee; border-radius: 8px; overflow: hidden; }
-
-/* 標頭列：背景色、文字顏色、加粗 */
-.table-header { 
-  display: flex; 
-  background: #f8f9fa; 
-  padding: 15px; 
-  font-weight: bold; 
-  color: #666; 
+.page-container {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 0 20px;
 }
 
-/* [標頭] 強制所有標題欄位都「置中」 */
-.table-header .col-info,
-.table-header .col-status,
-.table-header .col-deal,
-.table-header .col-action {
+.header-section {
+  margin-bottom: 30px;
+}
+.header-section h1 {
+  color: #2c3e50;
+  margin: 0 0 10px 0;
+  font-size: 1.8rem;
+}
+.subtitle {
+  color: #64748b;
+  margin: 0;
+}
+
+/* Loading & Empty */
+.loading-state,
+.empty-state {
+  text-align: center;
+  padding: 60px 0;
+  color: #64748b;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #eee;
+  border-top-color: #42b983;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.empty-state {
+  background: white;
+  border-radius: 16px;
+  padding: 60px 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  display: block;
+  opacity: 0.6;
+}
+.empty-state h3 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+.btn-primary {
+  display: inline-block;
+  margin-top: 20px;
+  background: #42b983;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: 0.2s;
+}
+.btn-primary:hover {
+  background: #3aa876;
+  transform: translateY(-2px);
+}
+
+/* --- 列表容器 --- */
+.listings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 單張卡片 (Row Layout) */
+.listing-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f1f5f9;
+  transition: all 0.3s ease;
+}
+
+.listing-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: #42b983;
+}
+
+/* 1. 圖片與標題 */
+.info-section {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 250px;
+}
+
+.img-wrapper {
+  width: 70px;
+  height: 70px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.img-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.text-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.item-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #334155;
+  font-weight: 600;
+}
+.meta-row {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+/* 2. 狀態標籤 */
+.status-section {
+  flex: 1;
+  display: flex;
   justify-content: center;
-  text-align: center;
+}
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.status-badge.available {
+  background: #f0fdf4;
+  color: #166534;
+} /* 上架中 - 綠 */
+.status-badge.reserved {
+  background: #eff6ff;
+  color: #1e40af;
+} /* 洽談中 - 藍 */
+.status-badge.exchanged,
+.status-badge.closed {
+  background: #f1f5f9;
+  color: #475569;
+} /* 結束 - 灰 */
+
+/* 3. 交易動態 (中間區塊) */
+.deal-section {
+  flex: 2;
+  display: flex;
+  justify-content: center;
 }
 
-/* 內容列：滑鼠移過去變色 */
-.table-row { display: flex; border-top: 1px solid #eee; padding: 20px 15px; align-items: center; background: #fff; }
-.table-row:hover { background: #fafafa; }
-
-/* --- [修改重點] 讓內容欄位也全部置中對齊 --- */
-
-/* 1. 物品資訊 (圖片+文字) */
-.col-info { 
-  flex: 3; 
-  display: flex; 
-  gap: 15px; 
-  align-items: center; 
-  justify-content: center; /* [新增] 讓圖片與文字整體水平置中 */
-  text-align: left;        /* (選填) 保持文字在圖片右側時靠左對齊，讀起來比較順 */
+/* 樣式 A: 進行中/完成的交易 */
+.active-deal-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 8px 15px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  justify-content: space-between;
+}
+.active-deal-box.completed {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
 }
 
-/* 2. 狀態 */
-.col-status { 
-  flex: 1; 
-  display: flex;           /* [新增] Flex 佈局 */
-  justify-content: center; /* [新增] 水平置中 */
-  align-items: center;     /* [新增] 垂直置中 */
-  text-align: center; 
+.deal-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+.deal-info .label {
+  font-weight: bold;
+  color: #1e40af;
+}
+.active-deal-box.completed .label {
+  color: #166534;
+}
+.partner-name {
+  color: #64748b;
 }
 
-/* 3. 交易紀錄 */
-.col-deal { 
-  flex: 2; 
-  padding: 0 15px; 
+.btn-check-deal {
+  font-size: 0.85rem;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+.btn-check-deal:hover {
+  text-decoration: underline;
+}
+
+/* 樣式 B: 待審核請求 */
+.pending-requests-box {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  padding: 8px 15px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  justify-content: space-between;
+}
+.notification-icon {
+  color: #f97316;
+}
+.request-info {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+.request-info .count {
+  font-weight: bold;
+  color: #c2410c;
+}
+.request-info .hint {
+  color: #fdba74;
+}
+
+.btn-check-requests {
+  font-size: 0.85rem;
+  color: #ea580c;
+  text-decoration: none;
+  font-weight: 600;
+  background: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #fed7aa;
+}
+.btn-check-requests:hover {
+  background: #fffaf0;
+}
+
+/* 樣式 C: 無動靜 */
+.no-activity {
+  color: #cbd5e0;
   font-size: 0.9rem;
-  display: flex;           /* [新增] Flex 佈局 */
-  flex-direction: column;  /* [新增] 垂直排列 (讓多行文字上下排) */
-  justify-content: center; /* [新增] 垂直置中 */
-  align-items: center;     /* [新增] 水平置中 */
-  text-align: center;      /* [新增] 文字置中 */
+  font-style: italic;
 }
 
-/* 4. 操作 (按鈕) */
-.col-action { 
-  flex: 1; 
-  display: flex;           /* [新增] Flex 佈局 */
-  justify-content: center; /* [新增] 水平置中 (原本是靠右) */
-  align-items: center;     /* [新增] 垂直置中 */
-  text-align: center;
+/* 4. 操作區 */
+.action-section {
+  flex: 0.8;
+  display: flex;
+  justify-content: flex-end;
+}
+.btn-view {
+  padding: 8px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: 0.2s;
+  background: white;
+  white-space: nowrap;
+}
+.btn-view:hover {
+  border-color: #42b983;
+  color: #42b983;
+  background: #f0fdf4;
 }
 
-/* --- 其他元件樣式 (保持不變) --- */
-.thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
-.text h4 { margin: 0 0 5px 0; font-size: 1rem; }
-.date { color: #999; font-size: 0.8rem; }
-
-.badge { padding: 4px 8px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; }
-.badge.AVAILABLE { background: #e3f2fd; color: #1976d2; }
-.badge.TRADING { background: #fff3e0; color: #f57c00; }
-.badge.TRADED { background: #e8f5e9; color: #388e3c; }
-
-.partner { margin: 0; color: #333; }
-.deal-status { color: #666; font-size: 0.85rem; margin-top: 2px; }
-.pending-count { color: #f57c00; font-weight: bold; font-size: 0.85rem; }
-.link { color: #1976d2; text-decoration: underline; font-size: 0.85rem; cursor: pointer; }
-
-.btn-view { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; color: #555; text-decoration: none; transition: all 0.2s; }
-.btn-view:hover { border-color: #333; color: #333; }
-
-.btn-primary { display: inline-block; background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; }
+/* RWD */
+@media (max-width: 768px) {
+  .listing-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  .info-section,
+  .status-section,
+  .deal-section,
+  .action-section {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .status-section {
+    justify-content: flex-start;
+  }
+  .action-section {
+    justify-content: stretch;
+  }
+  .btn-view {
+    width: 100%;
+    text-align: center;
+  }
+}
 </style>
