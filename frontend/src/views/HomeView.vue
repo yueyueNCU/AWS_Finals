@@ -86,7 +86,7 @@ const fetchItems = async () => {
   try {
     // 組合查詢參數
     const params = {};
-    if (filters.search) params.search = filters.search;
+    if (filters.search) params.keyword = filters.search;
     if (filters.category) params.category = filters.category;
 
     const res = await itemsApi.getItems(params);

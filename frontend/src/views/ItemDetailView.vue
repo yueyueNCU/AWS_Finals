@@ -82,8 +82,7 @@
                 <span class="select-arrow">▼</span>
               </div>
               <small v-if="myItems.length === 0" class="hint-text">
-                💡 你目前沒有上架的物品，建議先<router-link to="/post">刊登物品</router-link
-                >增加交換成功率！
+                💡 你目前沒有上架的物品，建議先<router-link to="/post">刊登物品</router-link>
               </small>
             </div>
 
@@ -169,7 +168,7 @@ const fetchMyItems = async () => {
       res = await itemsApi.getItems();
       res.data = res.data.filter((i) => i.owner_id === authStore.user.id);
     }
-    myItems.value = res.data;
+    myItems.value = res.data.filter((item) => item.status === "AVAILABLE");
   } catch (err) {
     console.error("Fetch my items error:", err);
   }
@@ -221,7 +220,12 @@ const formatDate = (dateStr) => {
 };
 
 const getStatusText = (status) => {
-  const map = { exchanged: "已交換", reserved: "洽談中", closed: "已結案" };
+  const map = {
+    AVAILABLE: "上架中",
+    TRADING: "洽談中",
+    TRADED: "已交換",
+    HIDDEN: "已下架",
+  };
   return map[status] || status;
 };
 
