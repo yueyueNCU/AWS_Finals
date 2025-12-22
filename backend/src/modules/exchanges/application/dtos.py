@@ -71,3 +71,22 @@ class ExchangeDetailResponse(BaseModel):
     offered_item: Optional[ItemInfo]
     deal_info: Optional[DealInfo]
     message: Optional[str]
+
+
+class SendMessageRequest(BaseModel):
+    content: str
+
+
+class MessageResponse(BaseModel):
+    id: int
+    sender_id: str
+    sender_name: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConfirmExchangeRequest(BaseModel):
+    pass

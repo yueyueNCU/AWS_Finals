@@ -10,9 +10,12 @@ from ...iam.dependencies import get_current_user
 from ...iam.domain.entity import User
 from ...inventory.infrastructure.repository import SqlAlchemyItemRepository
 from ..application.dtos import (
+    ConfirmExchangeRequest,
     CreateExchangeRequest,
     ExchangeDetailResponse,
     ExchangeListResponse,
+    MessageResponse,
+    SendMessageRequest,
     UpdateExchangeStatusRequest,
 )
 
@@ -95,9 +98,37 @@ def get_locations(service: ExchangeService = Depends(get_exchange_service)):
     return service.get_locations()
 
 
-# 系統資訊: 分類 (因為 ItemCategory 是 Enum，這裡簡單回傳即可)
-from ...inventory.domain.entity import ItemCategory
+@router.post("/exchanges/{exchange_id}/messages", response_model=MessageResponse)
+def send_message(
+    exchange_id: str,
+    request: SendMessageRequest,
+    current_user: User = Depends(get_current_user),
+    service: ExchangeService = Depends(get_exchange_service),
+):
+    return service.send_message(current_user.id, exchange_id, request.content)
 
+
+@router.get("/exchanges/{exchange_id}/messages", response_model=List[MessageResponse])
+def get_messages(
+    exchange_id: str,
+    current_user: User = Depends(get_current_user),
+    service: ExchangeService = Depends(get_exchange_service),
+):
+    return service.get_messages(current_user.id, exchange_id)
+
+
+@router.post("/exchanges/{exchange_id}/confirm")
+def confirm_exchange(
+    exchange_id: str,
+    # request 可以留空，或者用於接收評分
+    current_user: User = Depends(get_current_user),
+    service: ExchangeService = Depends(get_exchange_service),
+):
+    return service.confirm_exchange(current_user.id, exchange_id)
+
+
+# 系統資訊: 分類 (因為 ItemCategory 是 Enum，這裡簡單回傳即可)
+# from ...inventory.domain.entity import ItemCategory
 
 # @router.get("/categories")
 # def get_categories():
