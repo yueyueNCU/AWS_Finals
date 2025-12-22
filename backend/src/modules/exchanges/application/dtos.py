@@ -34,6 +34,7 @@ class ItemInfo(BaseModel):
 class LocationInfo(BaseModel):
     id: int
     name: str
+    address: str
 
 
 class DealInfo(BaseModel):

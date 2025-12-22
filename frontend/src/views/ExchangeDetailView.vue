@@ -75,17 +75,23 @@
           <p>雙方已接受交換，請透過下方對話框約定時間地點，完成後請點擊「確認完成」。</p>
         </div>
 
-        <div class="deal-location-info" v-if="exchange.deal_info?.meetup_location">
-          <div class="location-row">
+        <div class="deal-location-info">
+          <div v-if="exchange.deal_info?.meetup_location" class="location-row">
             <span>
               <strong>預定地點：</strong> {{ exchange.deal_info.meetup_location.name }}
-              <small class="text-muted"
-                >({{ getLocationAddress(exchange.deal_info.meetup_location.id) }})</small
-              >
+              <small class="text-muted">
+                ({{ exchange.deal_info?.meetup_location?.address || "無詳細地址" }})
+              </small>
             </span>
-
             <button v-if="authStore.user" @click="openLocationModal" class="btn-edit-loc">
               ✎ 修改
+            </button>
+          </div>
+
+          <div v-else class="location-row warning-box">
+            <span style="color: #f57c00">⚠️ 尚未約定面交地點</span>
+            <button v-if="authStore.user" @click="openLocationModal" class="btn-edit-loc">
+              📍 設定地點
             </button>
           </div>
         </div>
@@ -151,7 +157,7 @@
           <select v-model="selectedLocationId">
             <option disabled value="">請選擇地點...</option>
             <option v-for="loc in locations" :key="loc.id" :value="loc.id">
-              {{ loc.name }} ({{ getLocationAddress(loc.id) }})
+              {{ loc.name }} ({{ loc.address || "無詳細地址" }})
             </option>
           </select>
         </div>
@@ -177,7 +183,7 @@
           <select v-model="newLocationId">
             <option disabled value="">請選擇地點...</option>
             <option v-for="loc in locations" :key="loc.id" :value="loc.id">
-              {{ loc.name }} ({{ getLocationAddress(loc.id) }})
+              {{ loc.name }} ({{ loc.address || "無詳細地址" }})
             </option>
           </select>
         </div>
@@ -279,19 +285,29 @@ const openAcceptModal = async () => {
 };
 
 const handleAccept = async () => {
-  if (!selectedLocationId.value) return;
+  if (!selectedLocationId.value) {
+    alert("請選擇一個地點！");
+    return;
+  }
+
+  if (!confirm("確定要接受此交換請求嗎？")) return;
+
   isSubmitting.value = true;
   try {
+    // 將選中的地點 ID 傳給後端
     await exchangesApi.updateExchangeStatus(exchange.value.id, {
       action: "accept",
       meetup_location_id: selectedLocationId.value,
     });
+
     alert("已接受交易！");
     showAcceptModal.value = false;
-    fetchDetail(); // 重新整理以載入 Accepted 狀態 UI
+
+    // 重新獲取資料以更新畫面狀態
+    await fetchDetail();
   } catch (err) {
     console.error(err);
-    alert("操作失敗");
+    alert("操作失敗，請稍後再試");
   } finally {
     isSubmitting.value = false;
   }
@@ -384,15 +400,6 @@ const handleUpdateLocation = async () => {
   } finally {
     isSubmitting.value = false;
   }
-};
-
-const getLocationAddress = (id) => {
-  const addressMap = {
-    1: "校門口圓環旁",
-    2: "男九舍 B1 全家便利商店",
-    3: "依仁堂籃球場入口",
-  };
-  return addressMap[id] || "";
 };
 
 const translateStatus = (status) => {

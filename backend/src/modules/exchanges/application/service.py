@@ -24,7 +24,64 @@ from .dtos import (
 )
 
 # 地點清單 (暫時寫死，也可以存資料庫)
-LOCATIONS = {1: "正門圓環", 2: "男九舍全家", 3: "依仁堂籃球場"}
+LOCATIONS = {
+    1: {"name": "男3舍", "address": "宿舍"},
+    2: {"name": "男4舍", "address": "宿舍"},
+    3: {"name": "男6、7舍", "address": "宿舍"},
+    4: {"name": "男8舍", "address": "宿舍"},
+    5: {"name": "男9A", "address": "宿舍"},
+    6: {"name": "男9B", "address": "宿舍"},
+    7: {"name": "男11舍", "address": "宿舍"},
+    8: {"name": "男12舍", "address": "宿舍"},
+    9: {"name": "男13舍", "address": "宿舍"},
+    10: {"name": "女1-4舍", "address": "宿舍"},
+    11: {"name": "女14舍", "address": "宿舍"},
+    12: {"name": "國際學舍", "address": "宿舍"},
+    13: {"name": "曦望居", "address": "宿舍"},
+    14: {"name": "中大會館", "address": "宿舍"},
+    15: {"name": "工一", "address": "系館"},
+    16: {"name": "工二", "address": "系館"},
+    17: {"name": "工三", "address": "系館"},
+    18: {"name": "工四", "address": "系館"},
+    19: {"name": "工五", "address": "系館"},
+    20: {"name": "文一", "address": "系館"},
+    21: {"name": "文二", "address": "系館"},
+    22: {"name": "科一", "address": "系館"},
+    23: {"name": "科二", "address": "系館"},
+    24: {"name": "科三", "address": "系館"},
+    25: {"name": "科四", "address": "系館"},
+    26: {"name": "科五", "address": "系館"},
+    27: {"name": "志希館", "address": "系館"},
+    28: {"name": "鴻經管", "address": "系館"},
+    29: {"name": "綜教館", "address": "系館"},
+    30: {"name": "管理二館", "address": "系館"},
+    31: {"name": "松果餐廳", "address": "餐廳"},
+    32: {"name": "松苑餐廳", "address": "餐廳"},
+    33: {"name": "iHouse", "address": "其他"},
+    34: {"name": "藍屋", "address": "其他"},
+    35: {"name": "行政大樓", "address": "其他"},
+    36: {"name": "大禮堂", "address": "其他"},
+    37: {"name": "大講堂", "address": "其他"},
+    38: {"name": "校內郵局", "address": "其他"},
+    39: {"name": "據德樓", "address": "其他"},
+    40: {"name": "遊藝館", "address": "其他"},
+    41: {"name": "中大湖", "address": "其他"},
+    42: {"name": "游泳池", "address": "其他"},
+    43: {"name": "國民運動中心", "address": "其他"},
+    44: {"name": "訊息討論", "address": "其他"},
+    45: {"name": "後門門口", "address": "後門"},
+    46: {"name": "7-11", "address": "後門"},
+    47: {"name": "全家", "address": "後門"},
+    48: {"name": "232巷（緣舍）", "address": "後門"},
+    49: {"name": "永安居", "address": "後門"},
+    50: {"name": "萊姆斯", "address": "後門"},
+    51: {"name": "麥可小姐", "address": "後門"},
+    52: {"name": "阿米玲", "address": "後門"},
+    53: {"name": "食間巷內", "address": "後門"},
+    54: {"name": "宵夜街口", "address": "宵夜街"},
+    55: {"name": "sidewalk 人行道", "address": "宵夜街"},
+    56: {"name": "宵夜街下面", "address": "宵夜街"},
+}
 
 
 class ExchangeService:
@@ -254,19 +311,21 @@ class ExchangeService:
             target = self.item_repo.get_by_id(exchange_model.target_item_id)
             if target:
                 target.status = ItemStatus.AVAILABLE
-                self.db.add(target)
+                self.item_repo.save(target)
 
             # 還原 offered item (如果有)
             if exchange_model.offered_item_id:
                 offered = self.item_repo.get_by_id(exchange_model.offered_item_id)
                 if offered:
                     offered.status = ItemStatus.AVAILABLE
-                    self.db.add(offered)
+                    self.item_repo.save(offered)
 
         # 更新狀態
         exchange_model.status = ExchangeStatus.CANCELLED
         exchange_model.updated_at = datetime.now()
         self.db.commit()
+
+        return self._enrich_exchange_data(exchange_id)
 
         return self._enrich_exchange_data(exchange_id)
 
@@ -285,10 +344,22 @@ class ExchangeService:
             model.status in [ExchangeStatus.ACCEPTED, ExchangeStatus.COMPLETED]
             and model.meetup_location_id
         ):
-            loc_name = LOCATIONS.get(model.meetup_location_id, "Unknown")
+            loc_data = LOCATIONS.get(model.meetup_location_id)
+            if loc_data:
+                loc_obj = {
+                    "id": model.meetup_location_id,
+                    "name": loc_data["name"],
+                    "address": loc_data["address"],  # <--- 這裡加入了 address
+                }
+            else:
+                loc_obj = {
+                    "id": model.meetup_location_id,
+                    "name": "Unknown",
+                    "address": "",
+                }
             deal_info = {
-                "meetup_location": {"id": model.meetup_location_id, "name": loc_name},
-                "accepted_at": model.updated_at,  # 簡化：用更新時間當作接受時間
+                "meetup_location": loc_obj,
+                "accepted_at": model.updated_at,
             }
 
         return {
@@ -373,7 +444,10 @@ class ExchangeService:
             self.db.add(conflict)
 
     def get_locations(self):
-        return [{"id": k, "name": v} for k, v in LOCATIONS.items()]
+        return [
+            {"id": k, "name": v["name"], "address": v["address"]}
+            for k, v in LOCATIONS.items()
+        ]
 
     def send_message(self, user_id: str, exchange_id: str, content: str):
         exchange = self.repo.get_by_id(exchange_id)
