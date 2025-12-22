@@ -43,6 +43,7 @@ import { exchangesApi } from "@/api";
 const props = defineProps({
   exchangeId: { type: String, required: true },
   currentUserId: { type: String, required: true },
+  readOnly: { type: Boolean, default: false },
 });
 
 const messages = ref([]);
@@ -74,7 +75,7 @@ const fetchMessages = async () => {
 
 // 發送訊息
 const handleSend = async () => {
-  if (!newMessage.value.trim() || sending.value) return;
+  if (props.readOnly || !newMessage.value.trim() || sending.value) return;
 
   sending.value = true;
   try {
@@ -101,7 +102,9 @@ onMounted(() => {
   fetchMessages().then(() => (loading.value = false));
 
   // 每 3 秒輪詢一次新訊息
-  pollingTimer = setInterval(fetchMessages, 3000);
+  if (!props.readOnly) {
+    pollingTimer = setInterval(fetchMessages, 1000);
+  }
 });
 
 onUnmounted(() => {
@@ -211,5 +214,14 @@ onUnmounted(() => {
 }
 .input-area button:disabled {
   background: #ccc;
+}
+.read-only-area {
+  padding: 15px;
+  background: #f5f5f5;
+  color: #888;
+  text-align: center;
+  border-top: 1px solid #eee;
+  font-size: 0.9rem;
+  border-radius: 0 0 8px 8px;
 }
 </style>

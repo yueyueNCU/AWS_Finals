@@ -88,5 +88,9 @@ class MessageResponse(BaseModel):
         from_attributes = True
 
 
+class UpdateLocationRequest(BaseModel):
+    meetup_location_id: int
+
+
 class ConfirmExchangeRequest(BaseModel):
     pass
