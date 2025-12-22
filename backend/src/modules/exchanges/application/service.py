@@ -231,7 +231,6 @@ class ExchangeService:
 
             # 更新 Exchange
             exchange.status = ExchangeStatus.ACCEPTED
-            exchange.meetup_location_id = dto.meetup_location_id
 
             # 更新 Target Item
             target.status = ItemStatus.TRADING
@@ -506,8 +505,7 @@ class ExchangeService:
         return results
 
     # --- 雙方確認完成 ---
-    def confirm_exchange(self, user_id: str, exchange_id: str):
-        # 使用 DB Model 比較方便直接修改 Boolean 欄位
+    def confirm_exchange(self, user_id: str, exchange_id: str, action: str = "confirm"):
         exchange_model = (
             self.db.query(ExchangeModel).filter(ExchangeModel.id == exchange_id).first()
         )
@@ -519,30 +517,35 @@ class ExchangeService:
                 status_code=400, detail="Exchange is not in trading status"
             )
 
-        # 更新確認旗標
+        # 根據 action 決定是 確認(True) 還是 取消確認(False)
+        is_confirmed = True if action == "confirm" else False
+
         if user_id == exchange_model.requester_id:
-            exchange_model.requester_confirmed = True
+            exchange_model.requester_confirmed = is_confirmed
         elif user_id == exchange_model.owner_id:
-            exchange_model.owner_confirmed = True
+            exchange_model.owner_confirmed = is_confirmed
         else:
             raise HTTPException(status_code=403, detail="Not authorized")
 
-        # 檢查是否雙方都已確認
-        if exchange_model.requester_confirmed and exchange_model.owner_confirmed:
-            exchange_model.status = ExchangeStatus.COMPLETED
+        # 只有在「確認」動作時才檢查是否雙方都完成
+        if action == "confirm":
+            if exchange_model.requester_confirmed and exchange_model.owner_confirmed:
+                exchange_model.status = ExchangeStatus.COMPLETED
 
-            # (A) 更新對方的物品 (Target Item)
-            target_item = self.item_repo.get_by_id(exchange_model.target_item_id)
-            if target_item:
-                target_item.status = ItemStatus.TRADED
-                self.item_repo.save(target_item)
+                # (A) 更新對方的物品 (Target Item)
+                target_item = self.item_repo.get_by_id(exchange_model.target_item_id)
+                if target_item:
+                    target_item.status = ItemStatus.TRADED
+                    self.item_repo.save(target_item)
 
-            # (B) 更新我提供的物品 (Offered Item)，如果有的話
-            if exchange_model.offered_item_id:
-                offered_item = self.item_repo.get_by_id(exchange_model.offered_item_id)
-                if offered_item:
-                    offered_item.status = ItemStatus.TRADED
-                    self.item_repo.save(offered_item)
+                # (B) 更新我提供的物品 (Offered Item)
+                if exchange_model.offered_item_id:
+                    offered_item = self.item_repo.get_by_id(
+                        exchange_model.offered_item_id
+                    )
+                    if offered_item:
+                        offered_item.status = ItemStatus.TRADED
+                        self.item_repo.save(offered_item)
 
         exchange_model.updated_at = datetime.now()
         self.db.commit()

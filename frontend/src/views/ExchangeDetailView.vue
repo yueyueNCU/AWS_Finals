@@ -83,14 +83,22 @@
                 ({{ exchange.deal_info?.meetup_location?.address || "無詳細地址" }})
               </small>
             </span>
-            <button v-if="authStore.user" @click="openLocationModal" class="btn-edit-loc">
+            <button
+              v-if="authStore.user && !myConfirmed"
+              @click="openLocationModal"
+              class="btn-edit-loc"
+            >
               ✎ 修改
             </button>
           </div>
 
           <div v-else class="location-row warning-box">
             <span style="color: #f57c00">⚠️ 尚未約定面交地點</span>
-            <button v-if="authStore.user" @click="openLocationModal" class="btn-edit-loc">
+            <button
+              v-if="authStore.user && !myConfirmed"
+              @click="openLocationModal"
+              class="btn-edit-loc"
+            >
               📍 設定地點
             </button>
           </div>
@@ -105,7 +113,17 @@
           >
             ✅ 確認完成交易
           </button>
-          <div v-else class="confirmed-badge">您已確認，等待對方...</div>
+
+          <div v-else class="confirmed-wrapper">
+            <div class="confirmed-badge">您已確認，等待對方...</div>
+            <button
+              @click="handleRevokeConfirm"
+              class="btn-revoke-confirm"
+              :disabled="isSubmitting"
+            >
+              ❌ 取消確認
+            </button>
+          </div>
 
           <div v-if="partnerConfirmed" class="partner-status">(對方已確認)</div>
         </div>
@@ -322,8 +340,18 @@ const handleReject = async () => {
 const handleConfirm = async () => {
   if (!confirm("您確認已經完成交換了嗎？")) return;
   performAction(async () => {
-    await exchangesApi.confirmExchange(exchange.value.id);
+    await exchangesApi.confirmExchange(exchange.value.id, { action: "confirm" });
     alert("您已確認完成！若對方也確認後，交易將自動結束。");
+    fetchDetail();
+  });
+};
+
+// 取消確認邏輯
+const handleRevokeConfirm = async () => {
+  if (!confirm("要取消「確認完成」狀態嗎？")) return;
+  performAction(async () => {
+    await exchangesApi.confirmExchange(exchange.value.id, { action: "revoke" });
+    alert("已取消確認狀態。");
     fetchDetail();
   });
 };
@@ -668,5 +696,22 @@ onMounted(() => {
 .text-muted {
   color: #888;
   font-size: 0.9em;
+}
+.confirmed-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.btn-revoke-confirm {
+  background: transparent;
+  border: 1px solid #ff5252;
+  color: #ff5252;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.btn-revoke-confirm:hover {
+  background: #ffebee;
 }
 </style>
