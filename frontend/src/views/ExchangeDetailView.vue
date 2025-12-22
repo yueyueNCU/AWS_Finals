@@ -81,7 +81,7 @@
       <div v-if="exchange.status === 'accepted'" class="active-deal-dashboard">
         <div class="dashboard-header">
           <h3>交易進行中</h3>
-          <p>雙方已達成共識！請約定時間地點並完成交換。</p>
+          <p>請約定時間地點並完成交換。</p>
         </div>
 
         <div class="location-card">
@@ -94,7 +94,8 @@
               }}</span>
             </template>
             <template v-else>
-              <span class="warning">⚠️ 尚未約定面交地點</span>
+              <span class="warning">尚未約定面交地點</span>
+              <span class="sub-warning">請點擊右側按鈕設定地點</span>
             </template>
           </div>
           <button v-if="!myConfirmed" @click="openLocationModal" class="btn-edit-loc">
@@ -121,7 +122,7 @@
             class="btn-confirm-deal"
             :disabled="isSubmitting"
           >
-            ✅ 確認完成交易
+            確認完成交易
           </button>
 
           <div v-else class="waiting-msg">
@@ -152,7 +153,7 @@
       <div class="action-footer">
         <div v-if="isOwner && exchange.status === 'pending'" class="owner-actions">
           <button @click="handleReject" class="btn-reject" :disabled="isSubmitting">✕ 拒絕</button>
-          <button @click="openAcceptModal" class="btn-accept" :disabled="isSubmitting">
+          <button @click="handleAccept" class="btn-accept" :disabled="isSubmitting">
             ✓ 接受交換
           </button>
         </div>
@@ -162,70 +163,39 @@
 
           <button @click="handleCancel" class="btn-withdraw" :disabled="isSubmitting">
             <span class="icon">🚫</span>
-            {{ exchange.status === "pending" ? "撤回交換請求" : "取消並終止交易" }}
+            {{ exchange.status === "pending" ? "撤回交換請求" : "終止交易" }}
           </button>
 
           <p v-if="exchange.status === 'accepted'" class="cancel-hint">
-            ⚠️ 注意：取消後交易將終止，物品將自動重新上架。
+            取消後交易將終止，物品將自動重新上架。
           </p>
         </div>
       </div>
     </div>
 
     <Transition name="fade">
-      <div v-if="showAcceptModal" class="modal-overlay" @click.self="showAcceptModal = false">
-        <div class="modal-card">
-          <div class="modal-header">
-            <h3>確認接受交換</h3>
-            <button class="btn-close" @click="showAcceptModal = false">✕</button>
-          </div>
-          <div class="modal-body">
-            <p>太棒了！請選擇一個建議的面交地點供對方參考：</p>
-            <div class="form-group">
-              <label>面交地點</label>
-              <div class="select-wrapper">
-                <select v-model="selectedLocationId" class="styled-input styled-select">
-                  <option disabled value="">請選擇地點...</option>
-                  <option v-for="loc in locations" :key="loc.id" :value="loc.id">
-                    {{ loc.name }}
-                  </option>
-                </select>
-                <span class="select-arrow">▼</span>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button @click="showAcceptModal = false" class="btn-cancel">取消</button>
-            <button
-              @click="handleAccept"
-              class="btn-confirm"
-              :disabled="!selectedLocationId || isSubmitting"
-            >
-              確認成交
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <Transition name="fade">
       <div v-if="showLocationModal" class="modal-overlay" @click.self="showLocationModal = false">
         <div class="modal-card">
           <div class="modal-header">
-            <h3>更改面交地點</h3>
+            <h3>{{ exchange.deal_info?.meetup_location ? "更改" : "設定" }}面交地點</h3>
             <button class="btn-close" @click="showLocationModal = false">✕</button>
           </div>
           <div class="modal-body">
-            <div class="form-group">
-              <label>選擇新地點</label>
-              <div class="select-wrapper">
-                <select v-model="newLocationId" class="styled-input styled-select">
-                  <option disabled value="">請選擇地點...</option>
-                  <option v-for="loc in locations" :key="loc.id" :value="loc.id">
-                    {{ loc.name }}
-                  </option>
-                </select>
-                <span class="select-arrow">▼</span>
+            <p class="modal-desc">請選擇一個方便面交的地點：</p>
+
+            <div class="location-list">
+              <div
+                v-for="loc in locations"
+                :key="loc.id"
+                class="location-option"
+                :class="{ selected: newLocationId === loc.id }"
+                @click="newLocationId = loc.id"
+              >
+                <div class="radio-indicator"></div>
+                <div class="loc-text">
+                  <span class="loc-name">{{ loc.name }}</span>
+                  <span class="loc-addr">{{ loc.address }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -236,7 +206,7 @@
               class="btn-confirm"
               :disabled="!newLocationId || isSubmitting"
             >
-              更新地點
+              確認設定
             </button>
           </div>
         </div>
@@ -259,9 +229,7 @@ const authStore = useAuthStore();
 const loading = ref(true);
 const exchange = ref(null);
 const locations = ref([]);
-const showAcceptModal = ref(false);
 const showLocationModal = ref(false);
-const selectedLocationId = ref("");
 const newLocationId = ref("");
 const isSubmitting = ref(false);
 
@@ -269,7 +237,6 @@ const currentUserId = computed(() => authStore.user?.id);
 const isOwner = computed(() => exchange.value?.owner?.user_id === currentUserId.value);
 const isRequester = computed(() => exchange.value?.requester?.user_id === currentUserId.value);
 
-// 簡化物品取得邏輯
 const theirItem = computed(() =>
   isOwner.value ? exchange.value?.offered_item : exchange.value?.target_item
 );
@@ -309,27 +276,22 @@ const fetchDetail = async () => {
   }
 };
 
-const openAcceptModal = async () => {
-  try {
-    const res = await exchangesApi.getLocations();
-    locations.value = res.data;
-    showAcceptModal.value = true;
-  } catch (err) {
-    alert("無法載入地點");
-  }
-};
-
+// --- 修改：接受交換邏輯 ---
+// 不再開啟 Modal，直接確認後送出請求 (不帶地點 ID)
 const handleAccept = async () => {
+  if (!confirm("確定要接受此交換請求嗎？")) return;
+
   isSubmitting.value = true;
   try {
+    // 這裡只傳 action，不傳 location
     await exchangesApi.updateExchangeStatus(exchange.value.id, {
       action: "accept",
-      meetup_location_id: selectedLocationId.value,
     });
-    showAcceptModal.value = false;
-    fetchDetail();
+    // 重新整理資料，狀態會變更為 accepted
+    await fetchDetail();
   } catch (err) {
-    alert("操作失敗");
+    console.error(err);
+    alert("操作失敗，請稍後再試");
   } finally {
     isSubmitting.value = false;
   }
@@ -342,13 +304,11 @@ const handleReject = async () => {
 
 const handleConfirm = async () => {
   if (!confirm("確認已完成交換？")) return;
-  // 依據提供的 API，confirmExchange 可能不需參數，但也相容 action 參數
   performAction(() => exchangesApi.confirmExchange(exchange.value.id));
 };
 
 const handleRevokeConfirm = async () => {
   if (!confirm("要取消確認狀態嗎？")) return;
-  // 注意：若 API 不支援 revoke 動作，此處可能需調整
   performAction(() => exchangesApi.confirmExchange(exchange.value.id, { action: "revoke" }));
 };
 
@@ -369,23 +329,42 @@ const performAction = async (fn) => {
   }
 };
 
+// --- 修改：地點選擇邏輯 ---
 const openLocationModal = async () => {
+  // 如果還沒載入過地點，先載入
   if (locations.value.length === 0) {
-    const res = await exchangesApi.getLocations();
-    locations.value = res.data;
+    try {
+      const res = await exchangesApi.getLocations();
+      locations.value = res.data;
+    } catch (e) {
+      alert("無法載入地點列表");
+      return;
+    }
   }
+
+  // 設定預設值
   if (exchange.value.deal_info?.meetup_location?.id) {
     newLocationId.value = exchange.value.deal_info.meetup_location.id;
+  } else {
+    newLocationId.value = ""; // 重置
   }
+
   showLocationModal.value = true;
 };
 
 const handleUpdateLocation = async () => {
   if (!newLocationId.value) return;
-  performAction(async () => {
+
+  isSubmitting.value = true;
+  try {
     await exchangesApi.updateLocation(exchange.value.id, newLocationId.value);
     showLocationModal.value = false;
-  });
+    fetchDetail();
+  } catch (err) {
+    alert("更新地點失敗");
+  } finally {
+    isSubmitting.value = false;
+  }
 };
 
 const translateStatus = (s) =>
@@ -644,6 +623,10 @@ onMounted(fetchDetail);
   color: #f59e0b;
   font-weight: bold;
 }
+.loc-info .sub-warning {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
 .btn-edit-loc {
   border: 1px solid #cbd5e0;
   background: white;
@@ -652,6 +635,11 @@ onMounted(fetchDetail);
   cursor: pointer;
   color: #64748b;
   font-size: 0.9rem;
+  transition: 0.2s;
+}
+.btn-edit-loc:hover {
+  border-color: #2563eb;
+  color: #2563eb;
 }
 
 .confirmation-status {
@@ -775,7 +763,7 @@ onMounted(fetchDetail);
 
 .btn-withdraw {
   background-color: white;
-  border: 1px solid #ef4444; /* 紅色邊框 */
+  border: 1px solid #ef4444;
   color: #ef4444;
   padding: 10px 24px;
   border-radius: 8px;
@@ -790,7 +778,7 @@ onMounted(fetchDetail);
 }
 
 .btn-withdraw:hover:not(:disabled) {
-  background-color: #fef2f2; /* 懸浮時的淡紅色背景 */
+  background-color: #fef2f2;
   border-color: #dc2626;
   color: #dc2626;
   transform: translateY(-2px);
@@ -843,10 +831,13 @@ onMounted(fetchDetail);
 .modal-card {
   background: white;
   width: 90%;
-  max-width: 450px;
+  max-width: 500px;
   border-radius: 16px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
   overflow: hidden;
+  max-height: 90vh; /* 防止內容過長 */
+  display: flex;
+  flex-direction: column;
 }
 .modal-header {
   padding: 15px 20px;
@@ -857,36 +848,101 @@ onMounted(fetchDetail);
 }
 .modal-body {
   padding: 25px;
+  overflow-y: auto; /* 內容多時可捲動 */
 }
+.modal-desc {
+  color: #64748b;
+  margin-bottom: 15px;
+  font-size: 0.95rem;
+}
+
 .modal-footer {
   padding: 15px 25px;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
 }
-.select-wrapper {
+
+/* 優化後的 Location 選單樣式 
+  使用 Grid 或 Flex 列表取代 Select
+*/
+.location-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.location-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.location-option:hover {
+  background: #f8fafc;
+  border-color: #cbd5e0;
+}
+
+.location-option.selected {
+  border-color: #42b983;
+  background: #ecfdf5;
+}
+
+/* 模擬 Radio 按鈕 */
+.radio-indicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e0;
+  flex-shrink: 0;
   position: relative;
 }
-.styled-input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #cbd5e0;
-  border-radius: 8px;
-  background: white;
+
+.location-option.selected .radio-indicator {
+  border-color: #42b983;
 }
-.select-arrow {
+.location-option.selected .radio-indicator::after {
+  content: "";
   position: absolute;
-  right: 15px;
   top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  background: #42b983;
+  border-radius: 50%;
 }
+
+.loc-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.loc-name {
+  font-weight: 600;
+  color: #334155;
+  font-size: 1rem;
+}
+
+.loc-addr {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
 .btn-close {
   background: none;
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
+  color: #94a3b8;
 }
 .btn-cancel {
   background: white;
@@ -894,6 +950,7 @@ onMounted(fetchDetail);
   padding: 8px 20px;
   border-radius: 8px;
   cursor: pointer;
+  color: #64748b;
 }
 .btn-confirm {
   background: #42b983;
@@ -902,6 +959,11 @@ onMounted(fetchDetail);
   padding: 8px 20px;
   border-radius: 8px;
   cursor: pointer;
+  font-weight: 600;
+}
+.btn-confirm:disabled {
+  background: #a7f3d0;
+  cursor: not-allowed;
 }
 
 @media (max-width: 600px) {

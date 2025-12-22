@@ -43,7 +43,7 @@
             class="active-deal-box"
             :class="item.activeExchange.status"
           >
-            <span class="deal-icon">🤝</span>
+            <span class="deal-icon">🔄</span>
             <div class="deal-info">
               <span class="label">
                 {{ item.activeExchange.status === "completed" ? "已成交" : "交易進行中" }}
@@ -87,8 +87,16 @@ const myItems = ref([]);
 const loading = ref(true);
 
 const translateStatus = (status) => {
-  const map = { available: "上架中", exchanged: "已交換", reserved: "洽談中", closed: "已關閉" };
-  // 後端可能回傳大寫，做個相容
+  const map = {
+    available: "上架中",
+    trading: "交易中",
+    traded: "已交換",
+    reserved: "洽談中",
+    exchanged: "已交換",
+    closed: "已關閉",
+    hidden: "已下架",
+  };
+
   const key = status?.toLowerCase();
   return map[key] || status;
 };
@@ -106,11 +114,11 @@ const fetchData = async () => {
 
   loading.value = true;
   try {
-    // 平行呼叫：我的物品 & 別人對我的請求
-    // 注意：getExchanges('owner') 取得的是「別人對我的物品發出的請求」
-    const [itemsRes, exchangesRes] = await Promise.all([
-      itemsApi.getMyItems ? itemsApi.getMyItems() : itemsApi.getItems(), // 相容處理
-      exchangesApi.getExchanges("owner"),
+    // 平行呼叫：我的物品 & 兩種角色的交換請求
+    const [itemsRes, incomingRes, outgoingRes] = await Promise.all([
+      itemsApi.getMyItems ? itemsApi.getMyItems() : itemsApi.getItems(),
+      exchangesApi.getExchanges("owner"), // 別人對我的請求
+      exchangesApi.getExchanges("requester"), // 我對別人的請求
     ]);
 
     // 若 API 是 getItems (全部)，需手動過濾出自己的
@@ -119,17 +127,20 @@ const fetchData = async () => {
       items = items.filter((i) => i.owner_id === authStore.user.id);
     }
 
-    const allExchanges = exchangesRes.data;
+    // 合併兩份交換資料
+    const allExchanges = [...incomingRes.data, ...outgoingRes.data];
 
     // 資料整合
     myItems.value = items.map((item) => {
-      // 找出針對此物品的請求
-      const relatedExchanges = allExchanges.filter(
-        (ex) => ex.target_item?.id === item.id || ex.target_item_id === item.id
-      );
+      // 修改比對邏輯：檢查物品是否為「目標物品」或是「提供物品」
+      const relatedExchanges = allExchanges.filter((ex) => {
+        // 注意：後端 DTO 修正後應回傳 item_id
+        const isTarget = ex.target_item?.item_id === item.id;
+        const isOffered = ex.offered_item?.item_id === item.id;
+        return isTarget || isOffered;
+      });
 
       // 找出 Active Deal (Accepted 或 Completed)
-      // 注意後端欄位結構，這裡做些防呆
       const activeExchange = relatedExchanges.find((ex) =>
         ["accepted", "completed"].includes(ex.status)
       );
@@ -138,15 +149,17 @@ const fetchData = async () => {
       let activeExchangeData = null;
       if (activeExchange) {
         activeExchangeData = {
-          id: activeExchange.id,
+          id: activeExchange.exchange_id, // 注意 API 回傳的是 exchange_id
           status: activeExchange.status,
-          // 嘗試抓取對方的名字
-          partner_name: activeExchange.requester?.name || activeExchange.requester_name || "對方",
+          partner_name: activeExchange.partner?.name || "對方",
         };
       }
 
-      // 計算 Pending 數量
-      const requestCount = relatedExchanges.filter((ex) => ex.status === "pending").length;
+      // 計算 Pending 數量 (只計算別人對我的請求，或視需求調整)
+      // 通常我們只關心「別人對這個物品提出的請求」需要審核
+      const requestCount = relatedExchanges.filter(
+        (ex) => ex.status === "pending" && ex.target_item?.item_id === item.id
+      ).length;
 
       return {
         ...item,

@@ -23,5 +23,7 @@ class Exchange:
     status: ExchangeStatus
     message: Optional[str] = None
     meetup_location_id: Optional[int] = None
+    requester_confirmed: bool = False
+    owner_confirmed: bool = False
     created_at: datetime = datetime.now()
     updated_at: datetime = datetime.now()
