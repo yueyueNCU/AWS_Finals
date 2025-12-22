@@ -67,9 +67,10 @@ const handleImageError = (e) => {
 
 const getStatusText = (status) => {
   const map = {
-    exchanged: "已交換",
-    reserved: "洽談中",
-    closed: "已結案",
+    AVAILABLE: "上架中",
+    TRADING: "洽談中",
+    TRADED: "已交換",
+    HIDDEN: "已下架",
   };
   return map[status] || status;
 };
