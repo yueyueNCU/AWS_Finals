@@ -1,110 +1,120 @@
 <template>
-  <div class="container">
-    <div v-if="loading" class="loading">載入中...</div>
-    <div v-else-if="!exchange" class="error">找不到此交換請求</div>
+  <div class="page-container">
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>正在讀取交換詳情...</p>
+    </div>
+
+    <div v-else-if="!exchange" class="error-state">
+      <span class="icon">🚫</span>
+      <h3>找不到此交換請求</h3>
+      <button @click="router.push('/profile')" class="btn-back">返回個人頁面</button>
+    </div>
 
     <div v-else class="detail-card">
-      <div class="header">
-        <h1>
-          交換詳情 <small>#{{ exchange.id.slice(0, 8) }}...</small>
-        </h1>
-        <span class="status-badge" :class="exchange.status">
+      <div class="card-header">
+        <div class="header-left">
+          <h1>交換詳情</h1>
+          <span class="id-tag">#{{ exchange.id.slice(0, 8) }}</span>
+        </div>
+        <div class="status-badge" :class="exchange.status">
           {{ translateStatus(exchange.status) }}
-        </span>
+        </div>
       </div>
 
-      <div class="items-row">
-        <div class="item-box">
-          <h3>對方的物品</h3>
-          <template v-if="isOwner">
-            <div v-if="exchange.offered_item">
-              <img
-                :src="exchange.offered_item.cover_image || 'https://via.placeholder.com/150'"
-                class="thumb"
-              />
-              <p class="title">{{ exchange.offered_item.title }}</p>
-            </div>
-            <div v-else class="no-item"><p>（純索取）</p></div>
-          </template>
-          <template v-else>
-            <div v-if="exchange.target_item">
-              <img
-                :src="exchange.target_item.cover_image || 'https://via.placeholder.com/150'"
-                class="thumb"
-              />
-              <p class="title">{{ exchange.target_item.title }}</p>
-            </div>
-          </template>
+      <div class="exchange-visual">
+        <div class="party-col">
+          <div class="role-label">👤 對方提供</div>
+          <div class="item-card-mini" :class="{ empty: !theirItem }">
+            <template v-if="theirItem">
+              <div class="img-wrapper">
+                <img
+                  :src="
+                    theirItem.cover_image ||
+                    theirItem.image_url ||
+                    'https://via.placeholder.com/150'
+                  "
+                />
+              </div>
+              <p class="item-title">{{ theirItem.title }}</p>
+            </template>
+            <template v-else>
+              <span class="gift-icon">🎁</span>
+              <p class="item-title">索取</p>
+            </template>
+          </div>
         </div>
 
-        <div class="arrow">⇄</div>
+        <div class="exchange-icon">
+          <span class="arrow">⇄</span>
+        </div>
 
-        <div class="item-box highlight">
-          <h3>我的物品</h3>
-          <template v-if="isOwner">
-            <div v-if="exchange.target_item">
-              <img
-                :src="exchange.target_item.cover_image || 'https://via.placeholder.com/150'"
-                class="thumb"
-              />
-              <p class="title">{{ exchange.target_item.title }}</p>
-            </div>
-          </template>
-          <template v-else>
-            <div v-if="exchange.offered_item">
-              <img
-                :src="exchange.offered_item.cover_image || 'https://via.placeholder.com/150'"
-                class="thumb"
-              />
-              <p class="title">{{ exchange.offered_item.title }}</p>
-            </div>
-            <div v-else class="no-item"><p>（純索取）</p></div>
-          </template>
+        <div class="party-col">
+          <div class="role-label self">👤 我提供</div>
+          <div class="item-card-mini" :class="{ empty: !myItem }">
+            <template v-if="myItem">
+              <div class="img-wrapper">
+                <img
+                  :src="myItem.cover_image || myItem.image_url || 'https://via.placeholder.com/150'"
+                />
+              </div>
+              <p class="item-title">{{ myItem.title }}</p>
+            </template>
+            <template v-else>
+              <span class="gift-icon">🎁</span>
+              <p class="item-title">索取</p>
+            </template>
+          </div>
         </div>
       </div>
 
       <div class="message-section">
-        <h4>提出者備註：</h4>
-        <p class="message-content">{{ exchange.message || "無留言" }}</p>
-        <p class="meta">時間: {{ formatDate(exchange.created_at) }}</p>
+        <div class="quote-box">
+          <span class="quote-icon">❝</span>
+          <p class="message-content">{{ exchange.message || "（對方未留下訊息）" }}</p>
+          <div class="message-meta">
+            <span>請求時間：{{ formatDate(exchange.created_at) }}</span>
+          </div>
+        </div>
       </div>
 
-      <div v-if="exchange.status === 'accepted'" class="active-deal-section">
-        <div class="deal-header">
-          <h3>🤝 交易進行中</h3>
-          <p>雙方已接受交換，請透過下方對話框約定時間地點，完成後請點擊「確認完成」。</p>
+      <div v-if="exchange.status === 'accepted'" class="active-deal-dashboard">
+        <div class="dashboard-header">
+          <h3>交易進行中</h3>
+          <p>雙方已達成共識！請約定時間地點並完成交換。</p>
         </div>
 
-        <div class="deal-location-info">
-          <div v-if="exchange.deal_info?.meetup_location" class="location-row">
-            <span>
-              <strong>預定地點：</strong> {{ exchange.deal_info.meetup_location.name }}
-              <small class="text-muted">
-                ({{ exchange.deal_info?.meetup_location?.address || "無詳細地址" }})
-              </small>
-            </span>
-            <button
-              v-if="authStore.user && !myConfirmed"
-              @click="openLocationModal"
-              class="btn-edit-loc"
-            >
-              ✎ 修改
-            </button>
+        <div class="location-card">
+          <div class="loc-icon">📍</div>
+          <div class="loc-info">
+            <template v-if="exchange.deal_info?.meetup_location">
+              <strong>{{ exchange.deal_info.meetup_location.name }}</strong>
+              <span class="address">{{
+                exchange.deal_info.meetup_location.address || "無詳細地址"
+              }}</span>
+            </template>
+            <template v-else>
+              <span class="warning">⚠️ 尚未約定面交地點</span>
+            </template>
           </div>
+          <button v-if="!myConfirmed" @click="openLocationModal" class="btn-edit-loc">
+            {{ exchange.deal_info?.meetup_location ? "修改地點" : "設定地點" }}
+          </button>
+        </div>
 
-          <div v-else class="location-row warning-box">
-            <span style="color: #f57c00">⚠️ 尚未約定面交地點</span>
-            <button
-              v-if="authStore.user && !myConfirmed"
-              @click="openLocationModal"
-              class="btn-edit-loc"
-            >
-              📍 設定地點
-            </button>
+        <div class="confirmation-status">
+          <div class="status-step" :class="{ active: myConfirmed }">
+            <div class="step-circle">{{ myConfirmed ? "✓" : "1" }}</div>
+            <span>我方確認</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="status-step" :class="{ active: partnerConfirmed }">
+            <div class="step-circle">{{ partnerConfirmed ? "✓" : "2" }}</div>
+            <span>對方確認</span>
           </div>
         </div>
 
-        <div class="confirm-actions">
+        <div class="dashboard-actions">
           <button
             v-if="!myConfirmed"
             @click="handleConfirm"
@@ -114,110 +124,124 @@
             ✅ 確認完成交易
           </button>
 
-          <div v-else class="confirmed-wrapper">
-            <div class="confirmed-badge">您已確認，等待對方...</div>
-            <button
-              @click="handleRevokeConfirm"
-              class="btn-revoke-confirm"
-              :disabled="isSubmitting"
-            >
-              ❌ 取消確認
+          <div v-else class="waiting-msg">
+            <button @click="handleRevokeConfirm" class="btn-revoke" :disabled="isSubmitting">
+              ↺ 取消確認
             </button>
+            <span v-if="!partnerConfirmed">已確認，等待對方...</span>
           </div>
-
-          <div v-if="partnerConfirmed" class="partner-status">(對方已確認)</div>
         </div>
       </div>
 
-      <ChatBox
+      <div v-if="exchange.status === 'completed'" class="success-banner">
+        <h3>交易完成！</h3>
+        <p>感謝您的參與，物品交換已順利結束。</p>
+      </div>
+
+      <div
         v-if="['accepted', 'completed'].includes(exchange.status) && authStore.user"
-        :exchange-id="exchange.id"
-        :current-user-id="authStore.user.id"
-        :read-only="exchange.status === 'completed'"
-      />
+        class="chat-wrapper"
+      >
+        <ChatBox
+          :exchange-id="exchange.id"
+          :current-user-id="authStore.user.id"
+          :read-only="exchange.status === 'completed'"
+        />
+      </div>
 
-      <div class="action-area">
+      <div class="action-footer">
         <div v-if="isOwner && exchange.status === 'pending'" class="owner-actions">
-          <h3>審核請求</h3>
-          <div class="buttons">
-            <button @click="handleReject" class="btn-reject" :disabled="isSubmitting">
-              拒絕交換
-            </button>
-            <button @click="openAcceptModal" class="btn-accept" :disabled="isSubmitting">
-              接受交換
+          <button @click="handleReject" class="btn-reject" :disabled="isSubmitting">✕ 拒絕</button>
+          <button @click="openAcceptModal" class="btn-accept" :disabled="isSubmitting">
+            ✓ 接受交換
+          </button>
+        </div>
+
+        <div v-if="canCancel" class="cancel-wrapper">
+          <div class="divider"></div>
+
+          <button @click="handleCancel" class="btn-withdraw" :disabled="isSubmitting">
+            <span class="icon">🚫</span>
+            {{ exchange.status === "pending" ? "撤回交換請求" : "取消並終止交易" }}
+          </button>
+
+          <p v-if="exchange.status === 'accepted'" class="cancel-hint">
+            ⚠️ 注意：取消後交易將終止，物品將自動重新上架。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <Transition name="fade">
+      <div v-if="showAcceptModal" class="modal-overlay" @click.self="showAcceptModal = false">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>確認接受交換</h3>
+            <button class="btn-close" @click="showAcceptModal = false">✕</button>
+          </div>
+          <div class="modal-body">
+            <p>太棒了！請選擇一個建議的面交地點供對方參考：</p>
+            <div class="form-group">
+              <label>面交地點</label>
+              <div class="select-wrapper">
+                <select v-model="selectedLocationId" class="styled-input styled-select">
+                  <option disabled value="">請選擇地點...</option>
+                  <option v-for="loc in locations" :key="loc.id" :value="loc.id">
+                    {{ loc.name }}
+                  </option>
+                </select>
+                <span class="select-arrow">▼</span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="showAcceptModal = false" class="btn-cancel">取消</button>
+            <button
+              @click="handleAccept"
+              class="btn-confirm"
+              :disabled="!selectedLocationId || isSubmitting"
+            >
+              確認成交
             </button>
           </div>
         </div>
+      </div>
+    </Transition>
 
-        <div v-if="canCancel" class="cancel-section">
-          <hr />
-          <p class="warning-text" v-if="exchange.status === 'accepted'">
-            ⚠️ 若無法達成共識，您可以取消此交易，物品將重新上架。
-          </p>
-          <button @click="handleCancel" class="btn-cancel-exchange" :disabled="isSubmitting">
-            {{ exchange.status === "pending" ? "撤回請求" : "取消交易" }}
-          </button>
+    <Transition name="fade">
+      <div v-if="showLocationModal" class="modal-overlay" @click.self="showLocationModal = false">
+        <div class="modal-card">
+          <div class="modal-header">
+            <h3>更改面交地點</h3>
+            <button class="btn-close" @click="showLocationModal = false">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>選擇新地點</label>
+              <div class="select-wrapper">
+                <select v-model="newLocationId" class="styled-input styled-select">
+                  <option disabled value="">請選擇地點...</option>
+                  <option v-for="loc in locations" :key="loc.id" :value="loc.id">
+                    {{ loc.name }}
+                  </option>
+                </select>
+                <span class="select-arrow">▼</span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button @click="showLocationModal = false" class="btn-cancel">取消</button>
+            <button
+              @click="handleUpdateLocation"
+              class="btn-confirm"
+              :disabled="!newLocationId || isSubmitting"
+            >
+              更新地點
+            </button>
+          </div>
         </div>
       </div>
-
-      <div v-if="exchange.status === 'completed'" class="deal-info success">
-        <h3>🎉 交易圓滿完成！</h3>
-        <p>感謝您的使用。</p>
-      </div>
-    </div>
-
-    <div v-if="showAcceptModal" class="modal-overlay" @click.self="showAcceptModal = false">
-      <div class="modal-content">
-        <h3>確認接受交換</h3>
-        <p>請選擇一個面交地點供對方參考：</p>
-        <div class="form-group">
-          <label>面交地點</label>
-          <select v-model="selectedLocationId">
-            <option disabled value="">請選擇地點...</option>
-            <option v-for="loc in locations" :key="loc.id" :value="loc.id">
-              {{ loc.name }} ({{ loc.address || "無詳細地址" }})
-            </option>
-          </select>
-        </div>
-        <div class="modal-actions">
-          <button @click="showAcceptModal = false" class="btn-cancel">取消</button>
-          <button
-            @click="handleAccept"
-            class="btn-confirm"
-            :disabled="!selectedLocationId || isSubmitting"
-          >
-            確認成交
-          </button>
-        </div>
-      </div>
-    </div>
-    <div v-if="showLocationModal" class="modal-overlay" @click.self="showLocationModal = false">
-      <div class="modal-content">
-        <h3>更改面交地點</h3>
-        <p>請選擇新的面交地點：</p>
-
-        <div class="form-group">
-          <label>面交地點</label>
-          <select v-model="newLocationId">
-            <option disabled value="">請選擇地點...</option>
-            <option v-for="loc in locations" :key="loc.id" :value="loc.id">
-              {{ loc.name }} ({{ loc.address || "無詳細地址" }})
-            </option>
-          </select>
-        </div>
-
-        <div class="modal-actions">
-          <button @click="showLocationModal = false" class="btn-cancel">取消</button>
-          <button
-            @click="handleUpdateLocation"
-            class="btn-confirm"
-            :disabled="!newLocationId || isSubmitting"
-          >
-            更新地點
-          </button>
-        </div>
-      </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -226,7 +250,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { exchangesApi } from "@/api";
 import { useAuthStore } from "@/stores/auth";
-import ChatBox from "@/components/ChatBox.vue"; // 引入元件
+import ChatBox from "@/components/ChatBox.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -236,51 +260,45 @@ const loading = ref(true);
 const exchange = ref(null);
 const locations = ref([]);
 const showAcceptModal = ref(false);
+const showLocationModal = ref(false);
 const selectedLocationId = ref("");
+const newLocationId = ref("");
 const isSubmitting = ref(false);
 
-const showLocationModal = ref(false);
-const newLocationId = ref("");
-
-// 判斷身分
 const currentUserId = computed(() => authStore.user?.id);
 const isOwner = computed(() => exchange.value?.owner?.user_id === currentUserId.value);
 const isRequester = computed(() => exchange.value?.requester?.user_id === currentUserId.value);
 
-// 判斷確認狀態 (依賴後端回傳的新欄位)
+// 簡化物品取得邏輯
+const theirItem = computed(() =>
+  isOwner.value ? exchange.value?.offered_item : exchange.value?.target_item
+);
+const myItem = computed(() =>
+  isOwner.value ? exchange.value?.target_item : exchange.value?.offered_item
+);
+
 const myConfirmed = computed(() => {
   if (!exchange.value) return false;
-  if (isOwner.value) return exchange.value.owner_confirmed;
-  if (isRequester.value) return exchange.value.requester_confirmed;
-  return false;
+  return isOwner.value ? exchange.value.owner_confirmed : exchange.value.requester_confirmed;
 });
 
 const partnerConfirmed = computed(() => {
   if (!exchange.value) return false;
-  if (isOwner.value) return exchange.value.requester_confirmed;
-  if (isRequester.value) return exchange.value.owner_confirmed;
-  return false;
+  return isOwner.value ? exchange.value.requester_confirmed : exchange.value.owner_confirmed;
 });
 
-// 判斷是否顯示取消按鈕
 const canCancel = computed(() => {
   if (!exchange.value) return false;
   const status = exchange.value.status;
-
-  // Pending: 只有發起者可以撤回 (Owner 只能拒絕)
   if (status === "pending" && isRequester.value) return true;
-
-  // Accepted: 雙方都可以取消
   if (status === "accepted") return true;
-
   return false;
 });
 
 const fetchDetail = async () => {
   loading.value = true;
   try {
-    const id = route.params.id;
-    const res = await exchangesApi.getExchangeDetail(id);
+    const res = await exchangesApi.getExchangeDetail(route.params.id);
     exchange.value = res.data;
   } catch (err) {
     console.error(err);
@@ -297,421 +315,619 @@ const openAcceptModal = async () => {
     locations.value = res.data;
     showAcceptModal.value = true;
   } catch (err) {
-    console.error(err);
-    alert("無法載入地點清單");
+    alert("無法載入地點");
   }
 };
 
 const handleAccept = async () => {
-  if (!selectedLocationId.value) {
-    alert("請選擇一個地點！");
-    return;
-  }
-
-  if (!confirm("確定要接受此交換請求嗎？")) return;
-
   isSubmitting.value = true;
   try {
-    // 將選中的地點 ID 傳給後端
     await exchangesApi.updateExchangeStatus(exchange.value.id, {
       action: "accept",
       meetup_location_id: selectedLocationId.value,
     });
-
-    alert("已接受交易！");
     showAcceptModal.value = false;
-
-    // 重新獲取資料以更新畫面狀態
-    await fetchDetail();
+    fetchDetail();
   } catch (err) {
-    console.error(err);
-    alert("操作失敗，請稍後再試");
+    alert("操作失敗");
   } finally {
     isSubmitting.value = false;
   }
 };
 
 const handleReject = async () => {
-  if (!confirm("確定要拒絕此交換請求嗎？")) return;
+  if (!confirm("確定要拒絕此交換嗎？")) return;
   performAction(() => exchangesApi.updateExchangeStatus(exchange.value.id, { action: "reject" }));
 };
 
-// 確認交易邏輯
 const handleConfirm = async () => {
-  if (!confirm("您確認已經完成交換了嗎？")) return;
-  performAction(async () => {
-    await exchangesApi.confirmExchange(exchange.value.id, { action: "confirm" });
-    alert("您已確認完成！若對方也確認後，交易將自動結束。");
-    fetchDetail();
-  });
+  if (!confirm("確認已完成交換？")) return;
+  // 依據提供的 API，confirmExchange 可能不需參數，但也相容 action 參數
+  performAction(() => exchangesApi.confirmExchange(exchange.value.id));
 };
 
-// 取消確認邏輯
 const handleRevokeConfirm = async () => {
-  if (!confirm("要取消「確認完成」狀態嗎？")) return;
-  performAction(async () => {
-    await exchangesApi.confirmExchange(exchange.value.id, { action: "revoke" });
-    alert("已取消確認狀態。");
-    fetchDetail();
-  });
+  if (!confirm("要取消確認狀態嗎？")) return;
+  // 注意：若 API 不支援 revoke 動作，此處可能需調整
+  performAction(() => exchangesApi.confirmExchange(exchange.value.id, { action: "revoke" }));
 };
 
-// 取消交易邏輯
 const handleCancel = async () => {
-  const msg =
-    exchange.value.status === "accepted"
-      ? "交易正在進行中，確定要取消嗎？物品將會重新變為可交易狀態。"
-      : "確定要撤回此請求嗎？";
-
-  if (!confirm(msg)) return;
-  performAction(async () => {
-    await exchangesApi.cancelExchange(exchange.value.id);
-    alert("已取消交易");
-    fetchDetail(); // 或導回列表 router.push('/exchanges?role=...')
-  });
+  if (!confirm("確定要取消/撤回此交易嗎？")) return;
+  performAction(() => exchangesApi.cancelExchange(exchange.value.id));
 };
 
-// 輔助函式: 統一處理 try-catch
-const performAction = async (actionFn) => {
+const performAction = async (fn) => {
   isSubmitting.value = true;
   try {
-    await actionFn();
+    await fn();
     fetchDetail();
   } catch (err) {
-    console.error(err);
-    alert(err.response?.data?.detail || "操作失敗");
+    alert("操作失敗");
   } finally {
     isSubmitting.value = false;
   }
 };
 
-// 開啟修改地點視窗
 const openLocationModal = async () => {
-  // 如果還沒載入過地點，先載入
   if (locations.value.length === 0) {
-    try {
-      const res = await exchangesApi.getLocations();
-      locations.value = res.data;
-    } catch (err) {
-      alert("無法載入地點清單");
-      return;
-    }
+    const res = await exchangesApi.getLocations();
+    locations.value = res.data;
   }
-
-  // 預設選中目前的地點
   if (exchange.value.deal_info?.meetup_location?.id) {
     newLocationId.value = exchange.value.deal_info.meetup_location.id;
   }
-
   showLocationModal.value = true;
 };
 
-// 執行更新地點
 const handleUpdateLocation = async () => {
   if (!newLocationId.value) return;
-
-  // 避免重複選擇
-  if (exchange.value.deal_info?.meetup_location?.id === newLocationId.value) {
-    showLocationModal.value = false;
-    return;
-  }
-
-  isSubmitting.value = true;
-  try {
+  performAction(async () => {
     await exchangesApi.updateLocation(exchange.value.id, newLocationId.value);
-    alert("地點已更新！");
     showLocationModal.value = false;
-    fetchDetail(); // 重新整理畫面
-  } catch (err) {
-    console.error(err);
-    alert("更新失敗");
-  } finally {
-    isSubmitting.value = false;
-  }
+  });
 };
 
-const translateStatus = (status) => {
-  const map = {
+const translateStatus = (s) =>
+  ({
     pending: "等待中",
     accepted: "交易中",
     rejected: "已拒絕",
     completed: "已完成",
     cancelled: "已取消",
-  };
-  return map[status] || status;
-};
+  }[s] || s);
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleString();
-};
+const formatDate = (d) => (d ? new Date(d).toLocaleString() : "");
 
-onMounted(() => {
-  fetchDetail();
-});
+onMounted(fetchDetail);
 </script>
 
 <style scoped>
-/* 包含原有的 CSS */
-.container {
-  padding: 40px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-.detail-card {
-  border: 1px solid #ddd;
-  padding: 30px;
-  border-radius: 8px;
-  background: #fff;
-}
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-}
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-weight: bold;
-  font-size: 0.9rem;
-}
-.status-badge.pending {
-  background: #fff3e0;
-  color: #ef6c00;
-}
-.status-badge.accepted {
-  background: #e3f2fd;
-  color: #1976d2;
-} /* 改藍色系表示進行中 */
-.status-badge.rejected,
-.status-badge.cancelled {
-  background: #ffebee;
-  color: #c62828;
-}
-.status-badge.completed {
-  background: #e8f5e9;
-  color: #2e7d32;
+.page-container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 0 20px;
 }
 
-/* ... Items Row CSS (省略) ... */
-.items-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-.item-box {
+/* 狀態頁 */
+.loading-state,
+.error-state {
   text-align: center;
-  flex: 1;
-  min-width: 200px;
-  padding: 15px;
-  border: 1px solid #eee;
-  border-radius: 8px;
+  padding: 60px 0;
+  color: #64748b;
 }
-.item-box.highlight {
-  border-color: #4caf50;
-  background: #f9fff9;
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #eee;
+  border-top-color: #42b983;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  animation: spin 1s linear infinite;
 }
-.arrow {
-  font-size: 2rem;
-  color: #999;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
-.thumb {
-  width: 100px;
-  height: 100px;
-  object-fit: cover;
-  border-radius: 4px;
+.error-state .icon {
+  font-size: 3rem;
+  display: block;
   margin-bottom: 10px;
 }
-.title {
+
+/* 主卡片 */
+.detail-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  padding: 40px;
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 40px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 20px;
+}
+.header-left h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.8rem;
+}
+.id-tag {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+
+.status-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
   font-weight: bold;
+  font-size: 0.95rem;
+}
+.status-badge.pending {
+  background: #fff7ed;
+  color: #ea580c;
+}
+.status-badge.accepted {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.status-badge.completed {
+  background: #ecfdf5;
+  color: #059669;
+}
+.status-badge.rejected,
+.status-badge.cancelled {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
-.message-section {
-  background: #f5f5f5;
+/* 交換視覺化 */
+.exchange-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin-bottom: 40px;
+}
+.party-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 250px;
+}
+.role-label {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.role-label.self {
+  color: #42b983;
+}
+
+.item-card-mini {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   padding: 15px;
-  border-radius: 4px;
-  margin-bottom: 20px;
+  text-align: center;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
+}
+.item-card-mini:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.05);
+}
+.item-card-mini.empty {
+  background: #f8fafc;
+  border-style: dashed;
 }
 
-/* 新增樣式 */
-.active-deal-section {
-  background: #e3f2fd;
-  border: 1px solid #bbdefb;
-  padding: 20px;
+.img-wrapper {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
   border-radius: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
+  background: #f1f5f9;
 }
-.deal-header h3 {
-  color: #1565c0;
-  margin-top: 0;
+.img-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.confirm-actions {
-  margin-top: 15px;
+.gift-icon {
+  font-size: 3rem;
+  display: block;
+  margin: 20px 0;
+  opacity: 0.5;
+}
+.item-title {
+  font-weight: 600;
+  color: #334155;
+  margin: 0;
+  font-size: 1rem;
+}
+.exchange-icon .arrow {
+  font-size: 2rem;
+  color: #cbd5e0;
+}
+
+/* 訊息區 */
+.message-section {
+  margin-bottom: 30px;
+}
+.quote-box {
+  background: #f8fafc;
+  border-left: 4px solid #42b983;
+  padding: 20px 20px 20px 40px;
+  border-radius: 0 8px 8px 0;
+  position: relative;
+}
+.quote-icon {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  font-size: 2rem;
+  color: #cbd5e0;
+  line-height: 1;
+}
+.message-content {
+  color: #334155;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  margin: 0 0 10px 0;
+}
+.message-meta {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  text-align: right;
+}
+
+/* 交易儀表板 */
+.active-deal-dashboard {
+  background: linear-gradient(to right, #eff6ff, #f8fafc);
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  padding: 30px;
+  margin-bottom: 30px;
+}
+.dashboard-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+.dashboard-header h3 {
+  color: #1e40af;
+  margin: 0 0 5px;
+}
+.dashboard-header p {
+  color: #60a5fa;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.location-card {
+  background: white;
+  border-radius: 10px;
+  padding: 15px 20px;
   display: flex;
   align-items: center;
   gap: 15px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  margin-bottom: 25px;
 }
-.btn-confirm-deal {
-  background: #2196f3;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
+.loc-icon {
+  font-size: 1.5rem;
 }
-.btn-confirm-deal:hover {
-  background: #1976d2;
+.loc-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
-.confirmed-badge {
-  color: #2e7d32;
+.loc-info strong {
+  color: #1e293b;
+}
+.loc-info .address {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+.loc-info .warning {
+  color: #f59e0b;
   font-weight: bold;
-  background: #e8f5e9;
-  padding: 8px 15px;
-  border-radius: 20px;
 }
-.partner-status {
-  color: #666;
+.btn-edit-loc {
+  border: 1px solid #cbd5e0;
+  background: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #64748b;
   font-size: 0.9rem;
 }
 
-.cancel-section {
-  margin-top: 30px;
-  text-align: center;
+.confirmation-status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 25px;
 }
-.btn-cancel-exchange {
-  background: transparent;
-  border: 1px solid #999;
-  color: #666;
-  padding: 8px 16px;
-  border-radius: 4px;
+.status-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  opacity: 0.5;
+}
+.status-step.active {
+  opacity: 1;
+  color: #059669;
+}
+.step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+}
+.status-step.active .step-circle {
+  background: #059669;
+}
+.step-line {
+  width: 50px;
+  height: 2px;
+  background: #e2e8f0;
+}
+
+.dashboard-actions {
+  display: flex;
+  justify-content: center;
+}
+.btn-confirm-deal {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+}
+.btn-confirm-deal:hover {
+  background: #1d4ed8;
+}
+.waiting-msg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #059669;
+  font-weight: bold;
+}
+.btn-revoke {
+  background: white;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 6px 12px;
+  border-radius: 6px;
   cursor: pointer;
 }
-.btn-cancel-exchange:hover {
-  background: #f5f5f5;
-  color: #333;
+
+/* 底部按鈕 */
+.action-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  margin-top: 40px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 30px;
 }
-.warning-text {
-  color: #f57c00;
-  font-size: 0.9rem;
+.owner-actions {
+  display: flex;
+  gap: 20px;
+}
+.btn-accept {
+  background: #42b983;
+  color: white;
+  border: none;
+  padding: 10px 30px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-reject {
+  background: white;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 10px 30px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cancel-wrapper {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.divider {
+  height: 1px;
+  background-color: #f1f5f9;
+  width: 80%;
   margin-bottom: 10px;
 }
 
-.action-area {
-  margin-top: 30px;
-}
-.buttons {
+.btn-withdraw {
+  background-color: white;
+  border: 1px solid #ef4444; /* 紅色邊框 */
+  color: #ef4444;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
   display: flex;
-  gap: 20px;
-  justify-content: center;
-}
-.btn-reject {
-  background: #ff5252;
-  color: white;
-  border: none;
-  padding: 10px 30px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.btn-accept {
-  background: #4caf50;
-  color: white;
-  border: none;
-  padding: 10px 30px;
-  border-radius: 4px;
-  cursor: pointer;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
-/* Modal Styles */
+.btn-withdraw:hover:not(:disabled) {
+  background-color: #fef2f2; /* 懸浮時的淡紅色背景 */
+  border-color: #dc2626;
+  color: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.btn-withdraw:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-withdraw:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-withdraw .icon {
+  font-size: 1.1rem;
+}
+
+.cancel-hint {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 0;
+  text-align: center;
+}
+.success-banner {
+  background: #ecfdf5;
+  color: #065f46;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* Modal & RWD */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
 }
-.modal-content {
+.modal-card {
   background: white;
-  padding: 30px;
-  border-radius: 8px;
   width: 90%;
-  max-width: 400px;
+  max-width: 450px;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }
-.form-group select {
-  width: 100%;
-  padding: 10px;
-  margin-top: 5px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.modal-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
-.modal-actions {
-  margin-top: 20px;
+.modal-body {
+  padding: 25px;
+}
+.modal-footer {
+  padding: 15px 25px;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  background: #f8fafc;
+}
+.select-wrapper {
+  position: relative;
+}
+.styled-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e0;
+  border-radius: 8px;
+  background: white;
+}
+.select-arrow {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
 }
 .btn-cancel {
-  background: #ccc;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  background: white;
+  border: 1px solid #cbd5e0;
+  padding: 8px 20px;
+  border-radius: 8px;
   cursor: pointer;
 }
 .btn-confirm {
-  background: #4caf50;
+  background: #42b983;
   color: white;
   border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 8px 20px;
+  border-radius: 8px;
   cursor: pointer;
-}
-.location-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
-.btn-edit-loc {
-  background: transparent;
-  border: 1px solid #aaa;
-  color: #666;
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 0.8rem;
-  cursor: pointer;
+@media (max-width: 600px) {
+  .exchange-visual {
+    flex-direction: column;
+    gap: 15px;
+  }
+  .exchange-icon .arrow {
+    transform: rotate(90deg);
+  }
+  .party-col {
+    width: 100%;
+    max-width: none;
+  }
+  .card-header {
+    flex-direction: column;
+    gap: 10px;
+  }
 }
-.btn-edit-loc:hover {
-  background: #eee;
-  color: #333;
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
 }
-.text-muted {
-  color: #888;
-  font-size: 0.9em;
-}
-.confirmed-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.btn-revoke-confirm {
-  background: transparent;
-  border: 1px solid #ff5252;
-  color: #ff5252;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-.btn-revoke-confirm:hover {
-  background: #ffebee;
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
