@@ -76,9 +76,18 @@
         </div>
 
         <div class="deal-location-info" v-if="exchange.deal_info?.meetup_location">
-          <strong>預定地點：</strong> {{ exchange.deal_info.meetup_location.name }} ({{
-            getLocationAddress(exchange.deal_info.meetup_location.id)
-          }})
+          <div class="location-row">
+            <span>
+              <strong>預定地點：</strong> {{ exchange.deal_info.meetup_location.name }}
+              <small class="text-muted"
+                >({{ getLocationAddress(exchange.deal_info.meetup_location.id) }})</small
+              >
+            </span>
+
+            <button v-if="authStore.user" @click="openLocationModal" class="btn-edit-loc">
+              ✎ 修改
+            </button>
+          </div>
         </div>
 
         <div class="confirm-actions">
@@ -97,9 +106,10 @@
       </div>
 
       <ChatBox
-        v-if="exchange.status === 'accepted' && authStore.user"
+        v-if="['accepted', 'completed'].includes(exchange.status) && authStore.user"
         :exchange-id="exchange.id"
         :current-user-id="authStore.user.id"
+        :read-only="exchange.status === 'completed'"
       />
 
       <div class="action-area">
@@ -157,6 +167,33 @@
         </div>
       </div>
     </div>
+    <div v-if="showLocationModal" class="modal-overlay" @click.self="showLocationModal = false">
+      <div class="modal-content">
+        <h3>更改面交地點</h3>
+        <p>請選擇新的面交地點：</p>
+
+        <div class="form-group">
+          <label>面交地點</label>
+          <select v-model="newLocationId">
+            <option disabled value="">請選擇地點...</option>
+            <option v-for="loc in locations" :key="loc.id" :value="loc.id">
+              {{ loc.name }} ({{ getLocationAddress(loc.id) }})
+            </option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button @click="showLocationModal = false" class="btn-cancel">取消</button>
+          <button
+            @click="handleUpdateLocation"
+            class="btn-confirm"
+            :disabled="!newLocationId || isSubmitting"
+          >
+            更新地點
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -165,7 +202,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { exchangesApi } from "@/api";
 import { useAuthStore } from "@/stores/auth";
-import ChatBox from "@/components/ChatBox.vue"; // [新增] 引入元件
+import ChatBox from "@/components/ChatBox.vue"; // 引入元件
 
 const route = useRoute();
 const router = useRouter();
@@ -178,12 +215,15 @@ const showAcceptModal = ref(false);
 const selectedLocationId = ref("");
 const isSubmitting = ref(false);
 
-// [新增] 判斷身分
+const showLocationModal = ref(false);
+const newLocationId = ref("");
+
+// 判斷身分
 const currentUserId = computed(() => authStore.user?.id);
 const isOwner = computed(() => exchange.value?.owner?.user_id === currentUserId.value);
 const isRequester = computed(() => exchange.value?.requester?.user_id === currentUserId.value);
 
-// [新增] 判斷確認狀態 (依賴後端回傳的新欄位)
+// 判斷確認狀態 (依賴後端回傳的新欄位)
 const myConfirmed = computed(() => {
   if (!exchange.value) return false;
   if (isOwner.value) return exchange.value.owner_confirmed;
@@ -198,7 +238,7 @@ const partnerConfirmed = computed(() => {
   return false;
 });
 
-// [新增] 判斷是否顯示取消按鈕
+// 判斷是否顯示取消按鈕
 const canCancel = computed(() => {
   if (!exchange.value) return false;
   const status = exchange.value.status;
@@ -262,7 +302,7 @@ const handleReject = async () => {
   performAction(() => exchangesApi.updateExchangeStatus(exchange.value.id, { action: "reject" }));
 };
 
-// [新增] 確認交易邏輯
+// 確認交易邏輯
 const handleConfirm = async () => {
   if (!confirm("您確認已經完成交換了嗎？")) return;
   performAction(async () => {
@@ -272,7 +312,7 @@ const handleConfirm = async () => {
   });
 };
 
-// [新增] 取消交易邏輯
+// 取消交易邏輯
 const handleCancel = async () => {
   const msg =
     exchange.value.status === "accepted"
@@ -296,6 +336,51 @@ const performAction = async (actionFn) => {
   } catch (err) {
     console.error(err);
     alert(err.response?.data?.detail || "操作失敗");
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+// 開啟修改地點視窗
+const openLocationModal = async () => {
+  // 如果還沒載入過地點，先載入
+  if (locations.value.length === 0) {
+    try {
+      const res = await exchangesApi.getLocations();
+      locations.value = res.data;
+    } catch (err) {
+      alert("無法載入地點清單");
+      return;
+    }
+  }
+
+  // 預設選中目前的地點
+  if (exchange.value.deal_info?.meetup_location?.id) {
+    newLocationId.value = exchange.value.deal_info.meetup_location.id;
+  }
+
+  showLocationModal.value = true;
+};
+
+// 執行更新地點
+const handleUpdateLocation = async () => {
+  if (!newLocationId.value) return;
+
+  // 避免重複選擇
+  if (exchange.value.deal_info?.meetup_location?.id === newLocationId.value) {
+    showLocationModal.value = false;
+    return;
+  }
+
+  isSubmitting.value = true;
+  try {
+    await exchangesApi.updateLocation(exchange.value.id, newLocationId.value);
+    alert("地點已更新！");
+    showLocationModal.value = false;
+    fetchDetail(); // 重新整理畫面
+  } catch (err) {
+    console.error(err);
+    alert("更新失敗");
   } finally {
     isSubmitting.value = false;
   }
@@ -553,5 +638,28 @@ onMounted(() => {
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
+}
+.location-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-edit-loc {
+  background: transparent;
+  border: 1px solid #aaa;
+  color: #666;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.btn-edit-loc:hover {
+  background: #eee;
+  color: #333;
+}
+.text-muted {
+  color: #888;
+  font-size: 0.9em;
 }
 </style>

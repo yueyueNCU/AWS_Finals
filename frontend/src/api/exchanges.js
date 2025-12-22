@@ -58,4 +58,9 @@ export default {
   confirmExchange(exchangeId) {
     return apiClient.post(`/exchanges/${exchangeId}/confirm`);
   },
+
+  // 更新交易地點
+  updateLocation(id, locationId) {
+    return apiClient.patch(`/exchanges/${id}/location`, { meetup_location_id: locationId });
+  },
 };

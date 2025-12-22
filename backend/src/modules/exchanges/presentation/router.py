@@ -17,6 +17,7 @@ from ..application.dtos import (
     MessageResponse,
     SendMessageRequest,
     UpdateExchangeStatusRequest,
+    UpdateLocationRequest,
 )
 
 # 交換模組
@@ -125,6 +126,19 @@ def confirm_exchange(
     service: ExchangeService = Depends(get_exchange_service),
 ):
     return service.confirm_exchange(current_user.id, exchange_id)
+
+
+# 修改交易地點
+@router.patch("/exchanges/{exchange_id}/location")
+def update_exchange_location(
+    exchange_id: str,
+    request: UpdateLocationRequest,
+    current_user: User = Depends(get_current_user),
+    service: ExchangeService = Depends(get_exchange_service),
+):
+    return service.update_location(
+        current_user.id, exchange_id, request.meetup_location_id
+    )
 
 
 # 系統資訊: 分類 (因為 ItemCategory 是 Enum，這裡簡單回傳即可)

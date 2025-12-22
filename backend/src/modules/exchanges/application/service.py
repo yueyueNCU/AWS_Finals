@@ -391,7 +391,16 @@ class ExchangeService:
         self.db.add(new_msg)
         self.db.commit()
         self.db.refresh(new_msg)
-        return new_msg
+
+        sender_name = new_msg.sender.name if new_msg.sender else "Unknown"
+
+        return {
+            "id": new_msg.id,
+            "sender_id": new_msg.sender_id,
+            "sender_name": sender_name,
+            "content": new_msg.content,
+            "created_at": new_msg.created_at,
+        }
 
     def get_messages(self, user_id: str, exchange_id: str):
         # 驗證權限
@@ -422,7 +431,7 @@ class ExchangeService:
             )
         return results
 
-    # --- [新功能 2] 雙方確認完成 ---
+    # --- 雙方確認完成 ---
     def confirm_exchange(self, user_id: str, exchange_id: str):
         # 使用 DB Model 比較方便直接修改 Boolean 欄位
         exchange_model = (
@@ -448,10 +457,43 @@ class ExchangeService:
         if exchange_model.requester_confirmed and exchange_model.owner_confirmed:
             exchange_model.status = ExchangeStatus.COMPLETED
 
-            # TODO: 更新物品狀態為 "SOLD" 或 "COMPLETED" (視你的 ItemStatus 定義而定)
-            # self._mark_items_as_sold(exchange_model.target_item_id, exchange_model.offered_item_id)
+            # (A) 更新對方的物品 (Target Item)
+            target_item = self.item_repo.get_by_id(exchange_model.target_item_id)
+            if target_item:
+                target_item.status = ItemStatus.TRADED
+                self.item_repo.save(target_item)
+
+            # (B) 更新我提供的物品 (Offered Item)，如果有的話
+            if exchange_model.offered_item_id:
+                offered_item = self.item_repo.get_by_id(exchange_model.offered_item_id)
+                if offered_item:
+                    offered_item.status = ItemStatus.TRADED
+                    self.item_repo.save(offered_item)
 
         exchange_model.updated_at = datetime.now()
         self.db.commit()
+
+        return self._enrich_exchange_data(exchange_id)
+
+    def update_location(self, user_id: str, exchange_id: str, location_id: int):
+        exchange = self.repo.get_by_id(exchange_id)
+        if not exchange:
+            raise HTTPException(status_code=404, detail="Exchange not found")
+
+        # 1. 權限檢查：必須是 Requester 或 Owner
+        if user_id not in [exchange.requester_id, exchange.owner_id]:
+            raise HTTPException(status_code=403, detail="Permission denied")
+
+        # 2. 狀態檢查：必須是交易進行中 (ACCEPTED)
+        if exchange.status != ExchangeStatus.ACCEPTED:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot update location for this exchange status",
+            )
+
+        # 3. 更新地點
+        exchange.meetup_location_id = location_id
+        exchange.updated_at = datetime.now()
+        self.repo.save(exchange)
 
         return self._enrich_exchange_data(exchange_id)
