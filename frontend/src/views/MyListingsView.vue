@@ -98,16 +98,16 @@ const fetchData = async () => {
       
       // 2. 找出是否有「進行中 (Accepted)」或是「已完成 (Completed)」的交易
       //    這代表這個物品目前的 "Active Deal"
-      const activeExchange = relatedExchanges.find(ex => 
-        ['accepted', 'completed', 'trading'].includes(ex.status)
-      );
+      // const activeExchange = relatedExchanges.find(ex => 
+      //   ['accepted', 'completed', 'trading'].includes(ex.status)
+      // );
 
       // 3. 計算有多少個 Pending 請求
       const requestCount = relatedExchanges.filter(ex => ex.status === 'pending').length;
 
       return {
         ...item,
-        activeExchange, // 綁定成交資訊
+        // activeExchange, // 綁定成交資訊
         requestCount    // 綁定請求數量
       };
     });
