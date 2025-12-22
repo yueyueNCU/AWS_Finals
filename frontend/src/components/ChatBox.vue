@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <div class="input-area">
+    <div v-if="!readOnly" class="input-area">
       <input
         v-model="newMessage"
         @keyup.enter="handleSend"
@@ -33,6 +33,8 @@
       />
       <button @click="handleSend" :disabled="!newMessage.trim() || sending">發送</button>
     </div>
+
+    <div v-else class="read-only-area">交易已完成，聊天功能已關閉</div>
   </div>
 </template>
 

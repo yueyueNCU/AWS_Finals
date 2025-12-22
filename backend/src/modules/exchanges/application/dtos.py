@@ -14,7 +14,6 @@ class CreateExchangeRequest(BaseModel):
 
 class UpdateExchangeStatusRequest(BaseModel):
     action: str  # "accept" or "reject"
-    meetup_location_id: Optional[int] = None
 
 
 # Response DTOs (Nested Structures)
@@ -94,4 +93,4 @@ class UpdateLocationRequest(BaseModel):
 
 
 class ConfirmExchangeRequest(BaseModel):
-    pass
+    action: str = "confirm"  # "confirm" 或 "revoke" (取消確認)

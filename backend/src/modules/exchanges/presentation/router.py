@@ -121,11 +121,11 @@ def get_messages(
 @router.post("/exchanges/{exchange_id}/confirm")
 def confirm_exchange(
     exchange_id: str,
-    # request 可以留空，或者用於接收評分
+    request: ConfirmExchangeRequest,
     current_user: User = Depends(get_current_user),
     service: ExchangeService = Depends(get_exchange_service),
 ):
-    return service.confirm_exchange(current_user.id, exchange_id)
+    return service.confirm_exchange(current_user.id, exchange_id, request.action)
 
 
 # 修改交易地點
