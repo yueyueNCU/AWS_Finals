@@ -16,7 +16,7 @@ from .domain.entity import User
 security = HTTPBearer()
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
-    region = os.getenv("AWS_REGION", "us-east-1")
+    region = os.getenv("AWS_COGNITO_REGION", "")
     user_pool_id = os.getenv("COGNITO_USER_POOL_ID", "")
     app_client_id = os.getenv("COGNITO_APP_CLIENT_ID", "")
     cognito_domain = os.getenv("COGNITO_DOMAIN", "")

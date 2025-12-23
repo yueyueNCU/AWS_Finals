@@ -27,7 +27,9 @@ def login(
 def read_users_me(current_user: User = Depends(get_current_user)):
     return {
         "message": f"Hello, {current_user.name}",
+        "id": current_user.id,
         "email": current_user.email,
+        "name": current_user.name,
+        "avatar_url": current_user.avatar_url,
         "is_admin": current_user.is_admin,
-        "id": current_user.id
     }

@@ -47,8 +47,8 @@ async def create_item(
     前端需使用 'multipart/form-data' 格式發送 Request。
     """
     # 簡單驗證檔案類型 (可選)
-    if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
-        raise HTTPException(status_code=400, detail="Only JPEG or PNG images are allowed.")
+    if image.content_type not in ["image/jpeg", "image/png", "image/jpg", "image/heic", "image/webp"]:
+        raise HTTPException(status_code=400, detail="Only JPEG or PNG or heic or webp images are allowed.")
 
     # 讀取檔案內容 (bytes)
     file_content = await image.read()
@@ -64,6 +64,8 @@ async def create_item(
             filename=image.filename or "unknown_file",
             content_type=image.content_type
         )
+        new_item.owner_name = current_user.name
+        
         return new_item
         
     except Exception as e:
@@ -92,7 +94,59 @@ def search_items(
     return service.search_items(keyword, category)
 
 # ---------------------------------------------
-# 3. 取得單一物品詳情 (Get Item Detail)
+# 3. 取得目前登入使用者的所有物品 (包含歷史狀態)
+# ---------------------------------------------
+@router.get(
+    "/me", 
+    response_model=List[ItemResponse],
+    summary="取得我的物品清單 (含歷史紀錄)"
+)
+def get_my_items(
+    current_user: User = Depends(get_current_user),
+    service: ItemService = Depends(get_item_service)
+):
+    """
+    取得當前登入使用者刊登過的所有物品，包含：
+    - AVAILABLE (上架中)
+    - TRADING (交易洽談中)
+    - TRADED (已交換)
+    - HIDDEN (下架)
+    """
+    return service.get_user_items(current_user.id)
+
+# ---------------------------------------------
+# [新增] 取得物品分類清單 (從 Exchanges 搬過來的)
+# ⚠️ 注意：這必須放在 get_item (/{item_id}) 之前！
+# ---------------------------------------------
+@router.get(
+    "/categories", 
+    response_model=List[dict],
+    summary="取得物品分類清單"
+)
+def get_categories():
+    """
+    從 ItemCategory Enum 動態產生分類清單。
+    """
+    # 定義中文名稱對照
+    CATEGORY_MAP = {
+        ItemCategory.TEXTBOOK: "教科書",
+        ItemCategory.ELECTRONICS: "3C周邊",
+        ItemCategory.DAILY_USE: "生活用品",
+        ItemCategory.FOODSTUFF: "食品",
+        ItemCategory.FURNITURE: "家具",
+        ItemCategory.OTHER: "其他",
+    }
+    
+    return [
+        {
+            "id": category.value,
+            "name": CATEGORY_MAP.get(category, category.value)
+        }
+        for category in ItemCategory
+    ]
+
+# ---------------------------------------------
+# 4. 取得單一物品詳情 (Get Item Detail)
 # ---------------------------------------------
 @router.get(
     "/{item_id}", 

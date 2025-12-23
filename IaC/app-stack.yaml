@@ -137,15 +137,16 @@ Resources:
               DB_PASSWORD=${DBPassword}
               DB_NAME=${DBName}
               DB_PORT=3306
-              AWS_REGION="ap-southeast-2"
-              AWS_S3_REGION="us-east-1"
+              
+              AWS_COGNITO_REGION="ap-southeast-2"
               COGNITO_USER_POOL_ID="ap-southeast-2_TCtE1x780"
               COGNITO_APP_CLIENT_ID="3e01cbi503u29lb0jpm62ospm4"
               COGNITO_DOMAIN="ap-southeast-2tcte1x780.auth.ap-southeast-2.amazoncognito.com"
               COGNITO_REDIRECT_URI=https://www.yueyue.site/callback/
               COGNITO_CLIENT_SECRET="1v5aaact530l7cdve24shfm1qsseckbr03a3067i8ggk2usretml"
               ALLOWED_EMAIL_DOMAIN="g.ncu.edu.tw"
-              
+
+              AWS_S3_REGION="us-east-1"
               S3_BUCKET_NAME=${PublicAssetsBucketName}
               EOF
 
@@ -175,6 +176,8 @@ Resources:
                   listen 80;
                   server_name _;
 
+                  client_max_body_size 20M;
+                  
                   location ~ ^/(items|auth|docs|exchanges|locations|categories|openapi.json) {
                       proxy_pass http://127.0.0.1:8000;
                       proxy_set_header Host \$host;

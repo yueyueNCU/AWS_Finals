@@ -1,4 +1,4 @@
-import apiClient from './index';
+import apiClient from "./index";
 
 export default {
   // --- 交換流程 ---
@@ -12,7 +12,7 @@ export default {
   // 2. 取得我的交換列表
   // role: 'requester' (我提的) 或 'owner' (別人提的)
   getExchanges(role) {
-    return apiClient.get('/exchanges', { params: { role } });
+    return apiClient.get("/exchanges", { params: { role } });
   },
 
   // 3. 取得單一交換詳情
@@ -26,15 +26,40 @@ export default {
     return apiClient.patch(`/exchanges/${id}/status`, data);
   },
 
+  // 7. 取消交換請求 (撤銷)
+  // 對應後端: @router.delete("/exchanges/{exchange_id}")
+  cancelExchange(id) {
+    return apiClient.delete(`/exchanges/${id}`);
+  },
+
   // --- 系統資訊 (地點與分類) ---
-  
+
   // 5. 取得面交地點清單
   getLocations() {
-    return apiClient.get('/locations');
+    return apiClient.get("/locations");
   },
-  
+
   // 6. 取得分類清單
   getCategories() {
-      return apiClient.get('/categories');
-  }
+    return apiClient.get("/categories");
+  },
+
+  // 取得訊息
+  getMessages(exchangeId) {
+    return apiClient.get(`/exchanges/${exchangeId}/messages`);
+  },
+
+  // 發送訊息
+  sendMessage(exchangeId, content) {
+    return apiClient.post(`/exchanges/${exchangeId}/messages`, { content });
+  },
+
+  // 確認交易完成
+  confirmExchange(exchangeId, data = {}) {
+    return apiClient.post(`/exchanges/${exchangeId}/confirm`, data);
+  },
+  // 更新交易地點
+  updateLocation(id, locationId) {
+    return apiClient.patch(`/exchanges/${id}/location`, { meetup_location_id: locationId });
+  },
 };
