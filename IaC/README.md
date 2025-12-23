@@ -12,5 +12,6 @@ CertificateArn:
     Default: arn:aws:acm:us-east-1:534207971056:certificate/a93ab9b7-1021-45ff-8c5e-89f162d803c2
     Description: "The ARN of the SSL certificate in AWS ACM"
 ```
-8. 執行app-stack
-9. 去將load balancer的DNS_name給我
+8. 將app-stack.yml 中的ec2 userdata中的COGNITO_REDIRECT_URL的值改成你的網域
+9. 執行app-stack
+10. 去將load balancer的DNS_name給我

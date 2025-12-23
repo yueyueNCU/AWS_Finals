@@ -47,8 +47,8 @@ async def create_item(
     前端需使用 'multipart/form-data' 格式發送 Request。
     """
     # 簡單驗證檔案類型 (可選)
-    if image.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
-        raise HTTPException(status_code=400, detail="Only JPEG or PNG images are allowed.")
+    if image.content_type not in ["image/jpeg", "image/png", "image/jpg", "image/heic", "image/webp"]:
+        raise HTTPException(status_code=400, detail="Only JPEG or PNG or heic or webp images are allowed.")
 
     # 讀取檔案內容 (bytes)
     file_content = await image.read()
